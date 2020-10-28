@@ -13,7 +13,7 @@ state.completed = 0;
 
 
     if ~exist('file','var')
-        file ='lidar.mat'; 
+        file ='data/lidar.mat'; 
     end
 
     [posTimes, Npositions, dataL, scanTimes, v, omega] = get_init_data(file);
@@ -304,7 +304,7 @@ function MyCallBackA(~,~,x)
 end
 
 function [posTimes, Npositions, dataL, scanTimes, v, omega] = get_init_data(file)
-    file1 = load("imu.mat");
+    file1 = load("data/imu.mat");
     IMUData = file1.IMU;
     posTimes = (IMUData.times - IMUData.times(1)); % in seconds
     Npositions = IMUData.N;
@@ -313,7 +313,7 @@ function [posTimes, Npositions, dataL, scanTimes, v, omega] = get_init_data(file
     dataL = ScanData.dataL;
     scanTimes = double(dataL.times - IMUData.times(1));
 
-    file2 = load("speed.mat");
+    file2 = load("data/speed.mat");
     EncoderData = file2.Vel;
 
     v = EncoderData.speeds' - mean(EncoderData.speeds(1:1000)); % Noise over the first 5 seconds.

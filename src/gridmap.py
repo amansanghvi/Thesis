@@ -1,5 +1,7 @@
-from lidar import Scan
+from robot import Robot
+from lidar import Position, Scan
 import numpy as np
+import matplotlib.pyplot as plt
 
 MAP_LENGTH = 10 # metres
 CELLS_PER_ROW = 100
@@ -27,15 +29,32 @@ class GridMap:
     def __str__(self) -> str:
         return "Map: " + str(len(self._map)) + "x" + str(len(self._map[0])) + " cells"
     
-    def update(self, scan: Scan):
-        # Temporary
-        scan.x()
+    def update(self, robot: Robot, scan: Scan):
+        global_scan = scan.from_global_reference(robot.get_latest_pose())
+        for i in range(0, len(global_scan)):
+            cell = self.get_cell(global_scan[i].x, global_scan[i].y)
+            if cell != None:
+                self._map[round(cell.x), round(cell.y)] = True
+        return self
     
-    def get_cell(self, x: float, y: float): # Global x and y in metres
-        if y < -self._size/2 and y > self._size/2:
+    def get_cell(self, x: float, y: float) -> Position: # Global x and y in metres
+        if y < -self._size/2 or y > self._size/2:
             return None
-        elif x < -self._size/2 and x > self._size/2:
+        elif x < -self._size/2 or x > self._size/2:
             return None
-        return x/self._size * len(self._map)
+        return Position(x/self._size * len(self._map) + len(self._map)/2, y/self._size * len(self._map) + len(self._map)/2)
+    
+    def show(self):
+        x = []
+        y = []
+        for i in range(0, len(self._map)):
+            for j in range(0, len(self._map)):
+                if self._map[i][j]:
+                    x.append(i - len(self._map)/2)
+                    y.append(j - len(self._map)/2)
+        print(x)
+        plt.figure()
+        plt.scatter(x, y, s=2)
+        plt.show(block=False)
 
 

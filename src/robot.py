@@ -1,5 +1,6 @@
+import numpy as np
 from imu import Reading
-from math import cos, sin
+from math import cos, pi, sin
 
 MAP_LENGTH = 10 # metres
 CELLS_IN_ROW = 100
@@ -17,13 +18,13 @@ class Robot:
             raise Exception("Invalid attribute: " + str(idx))
         return self._map[idx]
 
-    def x(self) -> list:
+    def x(self) -> np.ndarray:
         return self._x
 
-    def y(self) -> list:
+    def y(self) -> np.ndarray:
         return self._y
 
-    def theta(self) -> list:
+    def theta(self) -> np.ndarray:
         return self._theta
 
     def get_latest_pose(self):
@@ -50,7 +51,7 @@ class Pose:
     def __init__(self, x: float, y: float, theta: float):
         self._x = x
         self._y = y
-        self.theta = theta
+        self._theta = theta
     
     def x(self) -> float:
         return self._x
@@ -60,5 +61,8 @@ class Pose:
 
     def theta(self) -> float:
         return self._theta
+
+    def __str__(self):
+        return "Pose: (" + str(self._x)  + ", " + str(self._y) + ") at " + str(self._theta*180/pi) + " degrees"
 
 
