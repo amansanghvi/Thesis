@@ -52,7 +52,6 @@ class GridMap:
                 if self._map[i][j]:
                     x.append(i - len(self._map)/2)
                     y.append(j - len(self._map)/2)
-        print(x)
         plt.figure()
         plt.scatter(x, y, s=2)
         plt.show(block=False)

@@ -1,6 +1,7 @@
 import numpy as np
 from imu import Reading
 from math import cos, pi, sin
+import matplotlib.pyplot as plt
 
 MAP_LENGTH = 10 # metres
 CELLS_IN_ROW = 100
@@ -30,7 +31,7 @@ class Robot:
     def get_latest_pose(self):
         return Pose(self._x[-1], self._y[-1], self._theta[-1])
     
-    def update_position(self, reading: Reading):
+    def imu_update(self, reading: Reading):
         prev_pose = self.get_latest_pose()
         
         new_theta = prev_pose.theta() + reading.dt()*reading.omega()
@@ -42,6 +43,17 @@ class Robot:
         self._theta.append(new_theta)
 
         return Pose(new_x, new_y, new_theta)
+
+    def map_update(self):
+        pass
+
+    def __str__(self) -> str:   
+        return "Robot at position: " + str(self.get_latest_pose())
+
+    def show(self):
+        plt.figure()
+        plt.plot(self._x, self._y)
+        plt.show(block=False)
         
 
 class Pose:
@@ -64,5 +76,4 @@ class Pose:
 
     def __str__(self):
         return "Pose: (" + str(self._x)  + ", " + str(self._y) + ") at " + str(self._theta*180/pi) + " degrees"
-
 

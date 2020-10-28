@@ -112,7 +112,7 @@ class Scan:
 
     def show(self):
         plt.figure()
-        plt.scatter(self._x, self._y, s=5)
+        plt.scatter(self._x, self._y, s=2)
         plt.xlim(0, 20)
         plt.ylim(-10, 10)
         plt.show(block=False)
