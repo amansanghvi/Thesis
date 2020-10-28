@@ -4,8 +4,8 @@ from lidar import Lidar
 
 
 if __name__ == "__main__":
-    lidar_data = Lidar("lidar")
-    imu_data = IMU("imu", "speed")
+    lidar_data = Lidar("../data/lidar")
+    imu_data = IMU("../data/imu", "../data/speed")
     map = GridMap()
 
     print(lidar_data)
