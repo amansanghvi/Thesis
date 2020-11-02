@@ -1,5 +1,5 @@
 from typing import List
-from robot import Pose
+from models import Pose, Position, timestamp_to_time
 from scipy.io import loadmat
 import matplotlib.pyplot as plt
 import numpy as np
@@ -12,23 +12,37 @@ class Lidar(Sequence):
 
     POINTS_PER_SCAN = POINTS_PER_SCAN
     _angles = [-pi/2 + i*pi/360 for i in range(0, POINTS_PER_SCAN)] # [-pi/2, pi/2]
-    _scans = []
-    _times = []
+    _scans = np.empty(0)
+    _times = np.empty(0)
 
-    def __init__(self, filename: str):
+    _matlab = None
+
+    def __init__(self, filename: str, engine): # Matlab engine
         super().__init__()
         lidarData = loadmat(filename)
         self._scans = np.array(
             [0.01*(x & 0x1FFF) for x in lidarData['dataL']['Scans'][0][0]]
         ).transpose()
         self._times = np.array([
-            0.0001*x for x in lidarData['dataL']['times'][0][0][0]]
+            x for x in lidarData['dataL']['times'][0][0][0]]
         )
+        self._matlab = engine
 
-    def __getitem__(self, name: int):
-        if not isinstance(name, int):
-            raise Exception("Invalid attribute: " + str(name))
-        return Scan(self._scans[name], self._times[name])
+    def __getitem__(self, idx: int):
+        if not (isinstance(idx, int) or isinstance(idx, np.int64)):
+            raise Exception("Invalid attribute: " + str(idx))
+        return Scan(self._scans[idx], self._times[idx])
+    
+    def timestamp_for_idx(self, idx: int) -> int:
+        if not (isinstance(idx, int) or isinstance(idx, np.int64)):
+            raise Exception("Invalid attribute: " + str(idx))
+        return self._times[idx]
+    
+    def get_at_time(self, timestamp: int):
+        idx = self._times.searchsorted(timestamp)
+        if idx == 0 or idx == len(self._times):
+            return None
+        return self[idx]
 
     def __len__(self) -> int:
         return len(self._scans)
@@ -45,7 +59,7 @@ class Lidar(Sequence):
         plt.draw()
         
         for i, scan in enumerate(self):
-            ax.title.set_text("Frame: " + str(i) + "/" + str(len(self)) + " (" + ("%.3f" % self._times[i]) + ")")
+            ax.title.set_text("Frame: " + str(i) + "/" + str(len(self)) + " (" + ("%.3f" % 0.0001*self._times[i]) + ")")
             x = scan.x()
             y = scan.y()
             sc.set_offsets([[x[i], y[i]] for i in range(0, Lidar.POINTS_PER_SCAN)])
@@ -53,24 +67,19 @@ class Lidar(Sequence):
             plt.pause(0.0001)
         plt.waitforbuttonpress()
 
-class Position:
-    x = 0
-    y = 0
-    def __init__(self, _x, _y):
-        self.x = _x
-        self.y = _y
-
 class Scan:
     _x = []
     _y = []
     _time = 0.0
+    _timestamp = 0
     
     def __init__(self, scan_data: np.ndarray, timestamp: int):
         if isinstance(scan_data, np.ndarray):
             self._x = np.array([scan_data[i]*cos(Lidar._angles[i]) for i in range(0, Lidar.POINTS_PER_SCAN)])
             self._y = np.array([scan_data[i]*sin(Lidar._angles[i]) + 0.46 for i in range(0, Lidar.POINTS_PER_SCAN)])
-        self._time = timestamp
-        
+        self._time = timestamp_to_time(timestamp)
+        self._timestamp = timestamp
+
     def x(self) -> np.ndarray:
         return self._x
 
@@ -79,6 +88,9 @@ class Scan:
 
     def time(self) -> float:
         return self._time
+
+    def timestamp(self) -> int:
+        return self._timestamp
     
     def __getitem__(self, idx: int) -> Position:
         if not isinstance(idx, int):
@@ -104,7 +116,7 @@ class Scan:
         )
 
         result = np.matmul(t_mat, curr_positions)
-        scan = Scan(None, self._time)
+        scan = Scan(None, self._timestamp)
         scan._x = result[0]
         scan._y = result[1]
         

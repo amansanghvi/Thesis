@@ -1,12 +1,13 @@
 from scipy.io import loadmat
 import numpy as np
 from collections.abc import Sequence
+from models import Reading, timestamp_to_time
 
 NUM_BASELINE = 1000
 class IMU(Sequence):
-    _omega = [] # Angular velocity (rad/s)
-    _speed = [] # velocities (m/s)
-    _times = []
+    _omega = np.empty(0) # Angular velocity (rad/s)
+    _speed = np.empty(0) # velocities (m/s)
+    _times = np.empty(0)
     def __init__(self, imu_file: str, encoder_file: str):
         super().__init__()
         imu_data = loadmat(imu_file)
@@ -20,37 +21,21 @@ class IMU(Sequence):
 
         self._omega = np.array([x - baseline_omega for x in raw_omega_data])
         self._speed = np.array([x - baseline_speed for x in raw_speed_data])
-        self._times = np.array([0.0001*x for x in imu_data["IMU"]['times'][0][0][0]])
+        self._times = np.array([x for x in imu_data["IMU"]['times'][0][0][0]])
     
-    def __getitem__(self, idx: int):
-        if not isinstance(idx, int):
-            raise Exception("Invalid attribute: " + str(idx))
-        dt = self._times[idx] - self._times[idx-1] if idx > 0 else 0.005 # 5ms
-        return Reading(self._omega[idx], self._speed[idx], dt)
-
+    def __getitem__(self, idx: int) -> Reading:
+        if not (isinstance(idx, int) or isinstance(idx, np.int64)):
+            raise Exception("Invalid attribute: " + str(idx) + " (" + str(type(idx)) + ")")
+        return Reading(self._omega[idx], self._speed[idx], self._times[idx])
+    
+    def get_at_time(self, timestamp: int) -> Reading:
+        idx = self._times.searchsorted(timestamp, side="right")
+        if idx == len(self._times):
+            return None
+        return self[idx]
+    
     def __len__(self) -> int:
         return len(self._omega)
 
     def __str__(self) -> str:
         return "IMU Class: " + str(len(self._omega)) + " readings"
-
-class Reading:
-    _omega = 0
-    _speed = 0
-    _dt = 0
-
-    def __init__(self, omega: float, speed: float, dt: float):
-        self._dt = dt
-        self._omega = omega
-        self._speed = speed
-    
-    def omega(self):
-        return self._omega
-
-    def speed(self):
-        return self._speed
-
-    def dt(self):
-        return self._dt
-
-

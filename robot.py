@@ -1,6 +1,7 @@
 import numpy as np
 from imu import Reading
-from math import cos, pi, sin
+from models import Pose
+from math import cos, sin
 import matplotlib.pyplot as plt
 
 MAP_LENGTH = 10 # metres
@@ -28,10 +29,10 @@ class Robot:
     def theta(self) -> np.ndarray:
         return self._theta
 
-    def get_latest_pose(self):
+    def get_latest_pose(self) -> Pose:
         return Pose(self._x[-1], self._y[-1], self._theta[-1])
     
-    def imu_update(self, reading: Reading):
+    def imu_update(self, reading: Reading) -> Pose:
         prev_pose = self.get_latest_pose()
         
         new_theta = prev_pose.theta() + reading.dt()*reading.omega()
@@ -54,26 +55,3 @@ class Robot:
         plt.figure()
         plt.plot(self._x, self._y)
         plt.show(block=False)
-        
-
-class Pose:
-    _x = 0
-    _y = 0
-    _theta = 0
-    def __init__(self, x: float, y: float, theta: float):
-        self._x = x
-        self._y = y
-        self._theta = theta
-    
-    def x(self) -> float:
-        return self._x
-
-    def y(self) -> float:
-        return self._y
-
-    def theta(self) -> float:
-        return self._theta
-
-    def __str__(self):
-        return "Pose: (" + str(self._x)  + ", " + str(self._y) + ") at " + str(self._theta*180/pi) + " degrees"
-
