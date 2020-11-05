@@ -1,4 +1,4 @@
-from robot import Robot
+from typing import Any, List, Optional, Tuple, Union, cast
 from lidar import Scan
 import numpy as np
 import matplotlib.pyplot as plt
@@ -10,15 +10,19 @@ CELLS_PER_ROW = 100
 CELL_SIZE = MAP_LENGTH / CELLS_PER_ROW
 
 class GridMap:
-    _map = [[]]
+    _map = np.array()
     _size = 0 # in metres
-    _matlab = None
+    _matlab: Any = None
+    log_odds_occ = 0.85 # Around 70% chance of lidar being right about which cell.
+    max_odds_occ = 3  # Can only be at most ~85% confident on occupancy.
+    log_odds_emp = 0.4  # Around 60% chance of beam passes through.
+    min_odds_emp = -2.2  # Can only be at most ~90% sure a cell is empty.
     def __init__(self, matlab, map_len=MAP_LENGTH, cell_size=CELL_SIZE):
         if map_len < 1:
             raise Exception("Cannot have map length less than 1m")
         dim = round(map_len/cell_size)
         self._map = np.zeros((dim, dim))
-        self._map.fill(False)
+        self._map.fill(0.0)
         self._size = map_len
         self._matlab = matlab
     
@@ -33,15 +37,43 @@ class GridMap:
     def __str__(self) -> str:
         return "Map: " + str(len(self._map)) + "x" + str(len(self._map[0])) + " cells"
     
-    def update(self, robot: Robot, scan: Scan):
-        global_scan = scan.from_global_reference(robot.get_latest_pose())
+    def get_pr_at(self, pos: Position):
+        cell = self.get_cell(pos.x, pos.y)
+        if cell == None:
+            return None
+        odds = np.exp(self._map[cast(Position, cell).x][cast(Position, cell).y])
+        return odds/(1 + odds)
+    
+    def update(self, robot_pose: Pose, scan: Scan) -> Any:
+        global_scan = scan.from_global_reference(robot_pose)
+        start_cell = self.get_cell(robot_pose.x(), robot_pose.y())
+        if start_cell == None:
+            return self
         for i in range(0, len(global_scan)):
-            cell = self.get_cell(global_scan[i].x, global_scan[i].y)
-            if cell != None and abs(cell.x) < len(self._map) and abs(cell.y) < len(self._map):
-                self._map[cell.x][cell.y] = True
+            end_cell = self.get_cell(global_scan[i].x, global_scan[i].y)
+            if end_cell == None:
+                continue
+            end_cell = cast(Position, end_cell)
+            start_cell = cast(Position, start_cell)
+            points_to_update = GridMap.get_affected_points(
+                start_cell.x, start_cell.y, 
+                end_cell.x, end_cell.y
+            )
+
+            for point in points_to_update:
+                if point[0] == end_cell.x and point[1] == end_cell.y:
+                    self._map[point[0]][point[1]] = min(
+                        self._map[point[0]][point[1]] + self.log_odds_occ, 
+                        self.max_odds_occ
+                    )
+                else:
+                    self._map[point[0]][point[1]] = max(
+                        self._map[point[0]][point[1]] - self.log_odds_emp, 
+                        self.min_odds_emp
+                    )
         return self
     
-    def get_cell(self, x: float, y: float) -> Position: # Global x and y in metres
+    def get_cell(self, x: float, y: float) -> Optional[Position]: # Global x and y in metres
         if y <= -self._size/2 or y >= self._size/2:
             return None
         elif x <= -self._size/2 or x >= self._size/2:
@@ -51,11 +83,11 @@ class GridMap:
             round(y/self._size * len(self._map) + len(self._map)/2)
         )
     
-    def get_scan_match(self, scan: Scan) -> Pose: # Global x and y in metres
+    def get_scan_match(self, scan: Scan, guess: Pose) -> Pose: # Global x and y in metres
         ref_points = []
         for x in range(0, len(self._map)):
             for y in range(0, len(self._map)):
-                if (self._map[x][y]):
+                if (self._map[x][y] > 0.1):
                     ref_points.append([ # TODO: Think this through
                         float(x - len(self._map)/2) * self._size/len(self._map), 
                         float(y - len(self._map)/2) * self._size/len(self._map), 
@@ -63,9 +95,41 @@ class GridMap:
         curr_points = []
         for i in range(0, len(scan)):
             curr_points.append([scan.x()[i], scan.y()[i]])
-        p = self._matlab.matchScanCustom(matlab.double(curr_points), matlab.double(ref_points))[0]
-        print(p)
+        p = self._matlab.matchScanCustom(
+            matlab.double(curr_points), 
+            matlab.double(ref_points),
+            matlab.double([guess.x(), guess.y(), guess.theta()])
+        )[0]
         return Pose(p[0], p[1], p[2])
+    
+    @staticmethod
+    def get_affected_points(x0: int, y0: int, x1: int, y1: int) -> List[Tuple[int, int]]:
+        dx = abs(x1 - x0)
+        dy = abs(y1 - y0)
+        if (dx == 0):
+            return [(x0, y) for y in range(y0, y1+1)]
+        if (dy == 0):
+            return [(x, y0) for x in range(x0, x1+1)]
+        xsign = 1 if x1 - x0 > 0 else -1
+        ysign = 1 if y1 - y0 > 0 else -1
+
+        steep = dy > dx
+        if steep:
+            dx, dy = dy, dx
+
+        D = 2*dy - dx
+        y = 0
+        result = []
+        for x in range(dx + 1):
+            if (steep):
+                result.append((x0 + xsign*y, y0 + ysign*x))
+            else:
+                result.append((x0 + xsign*x, y0 + ysign*y))
+            if D >= 0:
+                y += 1
+                D -= 2*dx
+            D += 2*dy
+        return result
         
     
     def show(self):
@@ -73,7 +137,7 @@ class GridMap:
         y = []
         for i in range(0, len(self._map)):
             for j in range(0, len(self._map)):
-                if self._map[i][j]:
+                if self._map[i][j] > 0.1:
                     x.append(i - len(self._map)/2)
                     y.append(j - len(self._map)/2)
         plt.figure()

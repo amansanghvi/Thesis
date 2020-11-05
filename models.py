@@ -4,9 +4,9 @@ def timestamp_to_time(timestamp: int) -> float:
     return 0.0001*timestamp
 
 class Reading:
-    _omega = 0
-    _speed = 0
-    _dt = 0
+    _omega = 0.0
+    _speed = 0.0
+    _dt = 0.0
     _timestamp = 0
 
     def __init__(self, omega: float, speed: float, timestamp: int):
@@ -37,9 +37,9 @@ class Position:
         self.y = _y
 
 class Pose:
-    _x = 0
-    _y = 0
-    _theta = 0
+    _x = 0.0
+    _y = 0.0
+    _theta = 0.0
     def __init__(self, x: float, y: float, theta: float):
         self._x = x
         self._y = y

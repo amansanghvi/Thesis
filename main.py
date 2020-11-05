@@ -16,12 +16,11 @@ if __name__ == "__main__":
     lidar_data = Lidar("./data/lidar", eng)
     imu_data = IMU("./data/imu", "./data/speed")
     map = GridMap(eng, 20)
-    robot = Robot()
+    robot = Robot(10, eng)
     
-    map.update(robot, lidar_data[0])
-    print(map.get_scan_match(lidar_data[1800]))
+    map.update(robot.get_latest_pose(), lidar_data[0])
+    # print(map.get_scan_match(lidar_data[1800]))
     
-    print(eng.matchScans)
     print(robot)
     print(lidar_data)
     print(imu_data)
@@ -46,11 +45,7 @@ if __name__ == "__main__":
         
     #     if lidar_data.timestamp_for_idx(lidar_idx) == t:
     #         map.update(robot, lidar_data[lidar_idx])
-    
-    lidar_data[0].show()
-    lidar_data[1800].show()
 
-    robot.show()
     map.show()
     plt.show()
     # lidar_data.show_all()

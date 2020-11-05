@@ -1,4 +1,4 @@
-from typing import List
+from typing import Any, List
 from models import Pose, Position, timestamp_to_time
 from scipy.io import loadmat
 import matplotlib.pyplot as plt
@@ -15,7 +15,7 @@ class Lidar(Sequence):
     _scans = np.empty(0)
     _times = np.empty(0)
 
-    _matlab = None
+    _matlab: Any = None
 
     def __init__(self, filename: str, engine): # Matlab engine
         super().__init__()
@@ -68,8 +68,8 @@ class Lidar(Sequence):
         plt.waitforbuttonpress()
 
 class Scan:
-    _x = []
-    _y = []
+    _x = np.array()
+    _y = np.array()
     _time = 0.0
     _timestamp = 0
     
@@ -102,6 +102,14 @@ class Scan:
     
     def __str__(self) -> str:
         return "Scan Class: " + str(len(self._x)) + " points at timestamp: " + str(self._time)
+        
+    def __iter__(self):
+        self.n = 0
+    def __next__(self):
+        self.n += 1
+        if self.n == len(self):
+            raise StopIteration
+        return self[self.n]
     
     def from_global_reference(self, frame: Pose): 
         # returns coordinates of points from global frame of reference 
