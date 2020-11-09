@@ -24,7 +24,7 @@ class IMU(Sequence):
         self._speed = np.array([x - baseline_speed for x in raw_speed_data])
         self._times = np.array([x for x in imu_data["IMU"]['times'][0][0][0]])
     
-    def __getitem__(self, idx: int) -> Optional[Reading]:
+    def __getitem__(self, idx: int) -> Reading:
         if not (isinstance(idx, int) or isinstance(idx, np.int64)):
             raise Exception("Invalid attribute: " + str(idx) + " (" + str(type(idx)) + ")")
         return Reading(self._omega[idx], self._speed[idx], self._times[idx])

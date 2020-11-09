@@ -68,8 +68,8 @@ class Lidar(Sequence):
         plt.waitforbuttonpress()
 
 class Scan:
-    _x = np.array()
-    _y = np.array()
+    _x = np.array([])
+    _y = np.array([])
     _time = 0.0
     _timestamp = 0
     
@@ -103,9 +103,10 @@ class Scan:
     def __str__(self) -> str:
         return "Scan Class: " + str(len(self._x)) + " points at timestamp: " + str(self._time)
         
-    def __iter__(self):
+    def __iter__(self) -> Position:
         self.n = 0
-    def __next__(self):
+        return self[self.n]
+    def __next__(self) -> Position:
         self.n += 1
         if self.n == len(self):
             raise StopIteration

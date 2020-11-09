@@ -44,7 +44,7 @@ if __name__ == "__main__":
     #         prev_timestamp = imu_reading.timestamp()
         
     #     if lidar_data.timestamp_for_idx(lidar_idx) == t:
-    #         map.update(robot, lidar_data[lidar_idx])
+    #         map.update(robot.get_latest_pose(), lidar_data[lidar_idx])
 
     map.show()
     plt.show()
