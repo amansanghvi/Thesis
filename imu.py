@@ -1,28 +1,18 @@
-from typing import Optional, Union
-from scipy.io import loadmat
+from IMUData import IMUData
+from typing import Optional
 import numpy as np
 from collections.abc import Sequence
-from models import Reading, timestamp_to_time
+from models import Reading
 
 NUM_BASELINE = 1000
 class IMU(Sequence):
     _omega = np.empty(0) # Angular velocity (rad/s)
     _speed = np.empty(0) # velocities (m/s)
     _times = np.empty(0)
-    def __init__(self, imu_file: str, encoder_file: str):
-        super().__init__()
-        imu_data = loadmat(imu_file)
-        encoder_data = loadmat(encoder_file)
-
-        raw_omega_data = imu_data["IMU"]['DATAf'][0][0][5]
-        baseline_omega = sum(raw_omega_data[0:NUM_BASELINE])/NUM_BASELINE
-
-        raw_speed_data = encoder_data["Vel"]['speeds'][0][0][0]
-        baseline_speed = sum(raw_speed_data[0:NUM_BASELINE])/NUM_BASELINE
-
-        self._omega = np.array([x - baseline_omega for x in raw_omega_data])
-        self._speed = np.array([x - baseline_speed for x in raw_speed_data])
-        self._times = np.array([x for x in imu_data["IMU"]['times'][0][0][0]])
+    def __init__(self, data: IMUData):
+        self._omega = data.get_yaws()
+        self._speed = data.get_speeds()
+        self._times = data.get_times()
     
     def __getitem__(self, idx: int) -> Reading:
         if not (isinstance(idx, int) or isinstance(idx, np.int64)):

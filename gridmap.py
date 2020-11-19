@@ -142,7 +142,7 @@ class GridMap:
         y = []
         for i in range(0, len(self._map)):
             for j in range(0, len(self._map)):
-                if self._map[i][j] > 0.1:
+                if self._map[i][j] > 1.0:
                     x.append(i - len(self._map)/2)
                     y.append(j - len(self._map)/2)
         plt.figure()

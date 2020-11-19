@@ -3,6 +3,9 @@ from math import pi
 def timestamp_to_time(timestamp: int) -> float:
     return 0.0001*timestamp
 
+def time_to_timestamp(time: float) -> int:
+    return round(1e4*time)
+
 class Reading:
     _omega = 0.0
     _speed = 0.0

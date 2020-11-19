@@ -4,7 +4,6 @@ from imu import Reading
 from gridmap import GridMap
 from models import Pose
 from math import cos, sin
-import scipy
 import matplotlib.pyplot as plt
 
 MAP_LENGTH = 10 # metres
