@@ -8,7 +8,7 @@ POINTS_PER_SCAN = 180
 class DefaultLidarData(LidarData):
 
     def load_and_format(self):
-        with open("./data/intel_LASER") as readFile:
+        with open("./data/intel_LASER_.txt") as readFile:
             content = readFile.read().splitlines()
             scans = np.array([list(map(float, line.split())) for line in content])
             times = np.array([time_to_timestamp(x) for x in range(len(scans))])

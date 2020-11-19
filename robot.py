@@ -35,15 +35,13 @@ class Robot:
     def imu_update(self, reading: Reading) -> Pose:
         prev_pose = self.get_latest_pose()
         
-        new_theta = prev_pose.theta() + reading.dt()*reading.omega()
-        new_x = prev_pose.x() + reading.dt()*cos(new_theta)*reading.speed()
-        new_y = prev_pose.y() + reading.dt()*sin(new_theta)*reading.speed()
+        next_pose = reading.get_moved_pose(prev_pose)
         
-        self._x.append(new_x)
-        self._y.append(new_y)
-        self._theta.append(new_theta)
+        self._x.append(next_pose.x())
+        self._y.append(next_pose.y())
+        self._theta.append(next_pose.theta())
 
-        return Pose(new_x, new_y, new_theta)
+        return next_pose
 
     def map_update(self, scan: Scan):
         scan_pose, cov = self._map.get_scan_match(scan, self.get_latest_pose())
