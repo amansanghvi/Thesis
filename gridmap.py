@@ -1,9 +1,11 @@
-from typing import Any, List, Optional, Tuple, Union, cast
-from lidar import Scan
-import numpy as np
-import matplotlib.pyplot as plt
-from models import Pose, Position
+from typing import Any, List, Optional, Tuple, cast
+
 import matlab
+import matplotlib.pyplot as plt
+import numpy as np
+
+from lidar import Scan
+from models import Pose, Position
 
 MAP_LENGTH = 10 # metres
 CELLS_PER_ROW = 100

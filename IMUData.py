@@ -1,7 +1,9 @@
 from abc import abstractclassmethod
-from models import Pose, Reading
 from typing import Tuple
+
 import numpy as np
+
+from models import Pose, Reading
 
 
 class IMUData:

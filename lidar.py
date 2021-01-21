@@ -1,10 +1,12 @@
-from LidarData import LidarData
+from collections.abc import Sequence
+from math import cos, sin
 from typing import Any
-from models import Pose, Position, timestamp_to_time
+
 import matplotlib.pyplot as plt
 import numpy as np
-from math import sin, cos
-from collections.abc import Sequence
+
+from LidarData import LidarData
+from models import Pose, Position, timestamp_to_time
 
 POINTS_PER_SCAN = 361
 

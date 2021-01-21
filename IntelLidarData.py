@@ -1,7 +1,9 @@
-from models import time_to_timestamp
-import numpy as np
 from math import pi
+
+import numpy as np
+
 from LidarData import LidarData
+from models import time_to_timestamp
 
 POINTS_PER_SCAN = 180
 

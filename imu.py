@@ -1,7 +1,10 @@
-from IMUData import IMUData
-import numpy as np
 from collections.abc import Sequence
+
+import numpy as np
+
+from IMUData import IMUData
 from models import Reading
+
 
 class IMU(Sequence):
     def __init__(self, data: IMUData):

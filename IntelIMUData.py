@@ -1,7 +1,7 @@
-from models import Pose, Reading, time_to_timestamp
 import numpy as np
-from math import pi
+
 from IMUData import IMUData
+from models import Pose, Reading, time_to_timestamp
 
 NUM_BASELINE = 1000
 class DefaultIMUData(IMUData):

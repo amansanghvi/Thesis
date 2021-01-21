@@ -1,12 +1,13 @@
-from DefaultIMUData import DefaultIMUData
-from DefaultLidarData import DefaultLidarData
-from models import timestamp_to_time
 import matlab.engine
 import matplotlib.pyplot as plt
-from robot import Robot
+
+from DefaultIMUData import DefaultIMUData
+from DefaultLidarData import DefaultLidarData
 from gridmap import GridMap
 from imu import IMU
 from lidar import Lidar
+from models import timestamp_to_time
+from robot import Robot
 
 if __name__ == "__main__":
     eng = matlab.engine.connect_matlab()

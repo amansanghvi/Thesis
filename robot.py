@@ -1,10 +1,10 @@
-from lidar import Scan
-import numpy as np
-from imu import Reading
-from gridmap import GridMap
-from models import Pose
-from math import cos, sin
 import matplotlib.pyplot as plt
+import numpy as np
+
+from gridmap import GridMap
+from imu import Reading
+from lidar import Scan
+from models import Pose
 
 MAP_LENGTH = 10 # metres
 CELLS_IN_ROW = 100
