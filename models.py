@@ -7,6 +7,13 @@ def timestamp_to_time(timestamp: int) -> float:
 def time_to_timestamp(time: float) -> int:
     return round(1e4*time)
 
+class Position:
+    x = 0
+    y = 0
+    def __init__(self, _x, _y):
+        self.x = _x
+        self.y = _y
+
 class Pose:
     _x = 0.0
     _y = 0.0
@@ -27,6 +34,9 @@ class Pose:
 
     def __str__(self):
         return "Pose: (" + str(self._x)  + ", " + str(self._y) + ") at " + str(self._theta*180/pi) + " degrees"
+
+    def pos(self) -> Position:
+        return Position(self._x, self._y)
 
 class Reading:
     _dt = 0.0
@@ -49,11 +59,3 @@ class Reading:
 
     def get_moved_pose(self, pose: Pose) -> Pose:
         return self._progress_fnc(pose, self)
-
-class Position:
-    x = 0
-    y = 0
-    def __init__(self, _x, _y):
-        self.x = _x
-        self.y = _y
-

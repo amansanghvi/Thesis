@@ -105,9 +105,10 @@ class GridMap:
         p, cov = self._matlab.matchScanCustom(
             matlab.double(curr_points), 
             matlab.double(ref_points),
-            matlab.double([guess.x(), guess.y(), guess.theta()],  nargout=2)
-        )[0]
-        return p, cov
+            matlab.double([guess.x(), guess.y(), guess.theta()]),
+            nargout=2
+        )
+        return p[0], cov
     
     @staticmethod
     def get_affected_points(x0: int, y0: int, x1: int, y1: int) -> List[Tuple[int, int]]:
@@ -138,8 +139,7 @@ class GridMap:
             D += 2*dy
         return result
         
-    
-    def show(self):
+    def get_occupied_points(self):
         x = []
         y = []
         for i in range(0, len(self._map)):
@@ -147,6 +147,10 @@ class GridMap:
                 if self._map[i][j] > 1.0:
                     x.append(i - len(self._map)/2)
                     y.append(j - len(self._map)/2)
+        return x, y
+    
+    def show(self):
+        x, y = self.get_occupied_points()
         plt.figure()
         plt.scatter(x, y, s=2)
         plt.show(block=False)
