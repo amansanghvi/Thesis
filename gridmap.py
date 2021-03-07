@@ -93,6 +93,7 @@ class GridMap:
     
     def get_scan_match(self, scan: Scan, guess: Pose) -> Tuple[List[float], List[List[float]]]:
         ref_points = []
+        
         for x in range(0, len(self._map)):
             for y in range(0, len(self._map)):
                 if (self._map[x][y] > 0.1):
@@ -102,9 +103,16 @@ class GridMap:
                     ])
         curr_points = []
         for i in range(0, len(scan)):
-            curr_points.append([scan.x()[i], scan.y()[i]])
+            curr_cell = self.get_cell(scan.x()[i], scan.y()[i])
+            if (curr_cell == None):
+                continue
+            curr_cell = cast(Position, curr_cell)
+            curr_points.append([
+                self.index_to_distance(curr_cell.x), 
+                self.index_to_distance(curr_cell.y)
+            ])
         p, cov = self._matlab.matchScanCustom(
-            matlab.double(curr_points), 
+            matlab.double(curr_points),
             matlab.double(ref_points),
             matlab.double([guess.x(), guess.y(), guess.theta()]),
             nargout=2

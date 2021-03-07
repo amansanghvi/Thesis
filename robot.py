@@ -18,6 +18,7 @@ class Robot:
     _theta = [0.0]
     _map: GridMap
     _weight = [0.0]
+    _cov = np.zeros((3, 3), dtype=np.longdouble)
     def __init__(self, num_particles, matlab):
         self._map = GridMap(matlab, 20)
         self._weight = [1.0/num_particles]
@@ -36,9 +37,15 @@ class Robot:
     
     def imu_update(self, reading: Reading) -> Pose:
         prev_pose = self.get_latest_pose()
-        
         next_pose = reading.get_moved_pose(prev_pose)
-        
+
+        dx = next_pose.x() - prev_pose.x()
+        dy = next_pose.y() - prev_pose.y()
+        dth = next_pose.theta() - prev_pose.theta()
+        self._cov[0][0] += abs(dx)*reading.dt()*0.1
+        self._cov[1][1] += abs(dy)*reading.dt()*0.1
+        self._cov[2][2] += abs(dth)*reading.dt()*0.1
+
         self._x.append(next_pose.x())
         self._y.append(next_pose.y())
         self._theta.append(next_pose.theta())
@@ -48,29 +55,32 @@ class Robot:
     def map_update(self, scan: Scan):
         latest_pose = self.get_latest_pose()
         scan_pose, cov = self._map.get_scan_match(scan, latest_pose)
-        print(scan_pose, cov)
+        print("scan_pose and cov: ", scan_pose, cov)
 
         K_sample_points = 10
         guesses = np.random.multivariate_normal([0, 0, 0], cov, K_sample_points)
-        x, y, th = guesses[:, 0], guesses[:, 1], guesses[:, 2]
+        dx, dy, dth = guesses[:, 0], guesses[:, 1], guesses[:, 2]
 
+        # TODO: Use the uncertainty in odometry to determine whether a sample point is used.
         selected_points = [
-            np.add(scan_pose, (x[i], y[i], th[i])) for i in range(len(x))
-                if abs(x[i]) < 4*cov[0][0] and abs(y[i]) < 4*cov[1][1] and abs(th[i]) < 4*cov[2][2]
+            np.add(scan_pose, (dx[i], dy[i], dth[i])) for i in range(len(dx))
+                if abs(dx[i]) < 2*self._cov[0][0] and abs(dy[i]) < 2*self._cov[1][1] and abs(dth[i]) < 2*self._cov[2][2]
         ]
         print("# k-points: " + str(len(selected_points)))
         # TODO: Get the predicted position below
         predicted_odd_mean = np.add([latest_pose.x(), latest_pose.y(), latest_pose.theta()], [0.0, 0.0, 0.0])
-        predicted_odd_cov = np.diag([0.02, 0.02, 0.03])
+        predicted_odd_cov = self._cov
         
         ksample_weights = self._generate_sample_weight(selected_points, predicted_odd_mean, predicted_odd_cov, scan)
         
-        mean = predicted_odd_mean
+        mean = np.zeros(3, dtype=np.longdouble)
+        sigma = np.zeros((3, 3), dtype=np.longdouble)
         norm = np.longdouble(0.0)
         for i in range(len(selected_points)):
             mean = np.add(mean, selected_points[i] * ksample_weights[i])
             norm = norm + ksample_weights[i]
-        if (norm < 0.0000001 and norm > -0.0000001):
+        
+        if (abs(norm) < 0.0000001):
             if len(selected_points) == 0:
                 mean = predicted_odd_mean
                 sigma = predicted_odd_cov
@@ -78,7 +88,6 @@ class Robot:
                 return
         else:
             mean = mean/norm
-            sigma = np.zeros((3, 3), dtype=np.longdouble)
             for i in range(len(selected_points)):
                 delta = np.add(selected_points[i], -mean)
                 sigma = sigma + delta*delta.T*ksample_weights[i]
@@ -87,6 +96,7 @@ class Robot:
         print("norm: " + str(norm) + " mean: " + str(mean))
         # TODO: Make x a distribution and use sigma as the uncertainty
         mean_pose = Pose(mean[0], mean[1], mean[2])
+        self._cov = sigma
         self._x.append(mean_pose.x())
         self._y.append(mean_pose.y())
         self._theta.append(mean_pose.theta())
@@ -94,7 +104,11 @@ class Robot:
 
     
     def _generate_sample_weight(self, selected_points: np.ndarray, predicted_odd_mean, predicted_odd_cov, scan: Scan) -> List[float]:
-        motion_model = scipy.multivariate_normal(predicted_odd_mean, predicted_odd_cov)
+        try:
+            motion_model = scipy.multivariate_normal(predicted_odd_mean, predicted_odd_cov)
+        except np.linalg.LinAlgError:
+            return np.zeros(len(selected_points), dtype=np.longdouble)
+
         ksample_weights = np.zeros(len(selected_points), dtype=np.longdouble)
         for i in range(len(selected_points)):
             x_k = selected_points[i]

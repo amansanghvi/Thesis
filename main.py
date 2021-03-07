@@ -52,11 +52,11 @@ if __name__ == "__main__":
             prev_timestamp = imu_reading.timestamp()
         
         if lidar_data.timestamp_for_idx(lidar_idx) == t:
-            # map.update(robot.get_latest_pose(), lidar_data[lidar_idx])
-            # if (lidar_idx < 100):
-            robot._map.update(robot.get_latest_pose(), lidar_data[lidar_idx])
-            # else:
-                # robot.map_update(lidar_data[lidar_idx])
+            map.update(robot.get_latest_pose(), lidar_data[lidar_idx])
+            if (lidar_idx < 20):
+                robot._map.update(robot.get_latest_pose(), lidar_data[lidar_idx])
+            else:
+                robot.map_update(lidar_data[lidar_idx])
 
             ax.set_title("Frame: " + str(plotFrameNumber))
             plotFrameNumber += 1
@@ -67,4 +67,8 @@ if __name__ == "__main__":
 
     map.show()
     plt.show()
+    print("ENDED")
+    ax.set_title("COMPLETED")
+    fig.canvas.draw_idle()
+    plt.pause(6000)
     # lidar_data.show_all()
