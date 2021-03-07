@@ -78,7 +78,8 @@ class GridMap:
                     )
         return self
     
-    def get_cell(self, x: float, y: float) -> Optional[Position]: # Global x and y in metres
+    # Input is GLOBAL x and y in metres
+    def get_cell(self, x: float, y: float) -> Optional[Position]:
         if y <= -self._size/2 or y >= self._size/2:
             return None
         elif x <= -self._size/2 or x >= self._size/2:
@@ -96,8 +97,8 @@ class GridMap:
             for y in range(0, len(self._map)):
                 if (self._map[x][y] > 0.1):
                     ref_points.append([ # TODO: Think this through
-                        float(x - len(self._map)/2) * self._size/len(self._map), 
-                        float(y - len(self._map)/2) * self._size/len(self._map), 
+                        self.index_to_distance(x), 
+                        self.index_to_distance(y)
                     ])
         curr_points = []
         for i in range(0, len(scan)):
@@ -139,6 +140,8 @@ class GridMap:
             D += 2*dy
         return result
         
+    # Does not gives accurate position. 
+    # Distances between points are arbitrarily scaled.
     def get_occupied_points(self):
         x = []
         y = []
@@ -146,9 +149,12 @@ class GridMap:
             for j in range(0, len(self._map)):
                 if self._map[i][j] > 1.0:
                     x.append(i - len(self._map)/2)
-                    y.append(j - len(self._map)/2)
+                    y.append(j - len(self._map)/2) 
         return x, y
     
+    def index_to_distance(self, i: int) -> float:
+        return float(i - len(self._map)/2) * self._size/len(self._map)
+
     def show(self):
         x, y = self.get_occupied_points()
         plt.figure()

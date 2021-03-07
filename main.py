@@ -15,7 +15,7 @@ if __name__ == "__main__":
 
     lidar_data = Lidar(DefaultLidarData(), eng)
     imu_data = IMU(DefaultIMUData())
-    map = GridMap(eng, 20)
+    map = GridMap(eng, 20, 0.1)
     robot = Robot(10, eng)
     
     map.update(robot.get_latest_pose(), lidar_data[0])
@@ -53,7 +53,10 @@ if __name__ == "__main__":
         
         if lidar_data.timestamp_for_idx(lidar_idx) == t:
             # map.update(robot.get_latest_pose(), lidar_data[lidar_idx])
-            robot.map_update(lidar_data[lidar_idx])
+            # if (lidar_idx < 100):
+            robot._map.update(robot.get_latest_pose(), lidar_data[lidar_idx])
+            # else:
+                # robot.map_update(lidar_data[lidar_idx])
 
             ax.set_title("Frame: " + str(plotFrameNumber))
             plotFrameNumber += 1
