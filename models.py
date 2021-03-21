@@ -1,5 +1,6 @@
 from typing import Any, Callable
 from math import pi
+import numpy as np
 
 def timestamp_to_time(timestamp: int) -> float:
     return 0.0001*timestamp
@@ -40,10 +41,17 @@ class Pose:
 
 class Reading:
     _dt = 0.0
-    def __init__(self, data, timestamp: int, progress_fnc: Callable[[Pose, Any], Pose]):
-        self._progress_fnc = progress_fnc
+    def __init__(self, 
+        data, timestamp: int, 
+        progress_fnc: Callable[[Pose, Any], Pose],
+        get_cov_change_matrix_fnc: Callable[[Pose, Any], np.ndarray],
+        get_cov_input_uncertainty: Callable[[Pose, Any], np.ndarray]
+    ):
         self._timestamp = timestamp
         self._data = data
+        self._progress_fnc = progress_fnc
+        self._get_cov_change_matrix_fnc = get_cov_change_matrix_fnc
+        self._get_cov_input_uncertainty = get_cov_input_uncertainty
 
     def dt(self) -> float:
         return self._dt
@@ -59,3 +67,9 @@ class Reading:
 
     def get_moved_pose(self, pose: Pose) -> Pose:
         return self._progress_fnc(pose, self)
+    
+    def get_cov_change_matrix(self, pose: Pose) -> np.ndarray:
+        return self._get_cov_change_matrix_fnc(pose, self)
+    
+    def get_cov_input_uncertainty(self, pose: Pose) -> np.ndarray:
+        return self._get_cov_input_uncertainty(pose, self)

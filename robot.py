@@ -34,17 +34,14 @@ class Robot:
 
     def get_latest_pose(self) -> Pose:
         return Pose(self._x[-1], self._y[-1], self._theta[-1])
-    
+
     def imu_update(self, reading: Reading) -> Pose:
         prev_pose = self.get_latest_pose()
         next_pose = reading.get_moved_pose(prev_pose)
+        change_matrix = reading.get_cov_change_matrix(prev_pose)
 
-        dx = next_pose.x() - prev_pose.x()
-        dy = next_pose.y() - prev_pose.y()
-        dth = next_pose.theta() - prev_pose.theta()
-        self._cov[0][0] += abs(dx)*reading.dt()*0.1
-        self._cov[1][1] += abs(dy)*reading.dt()*0.1
-        self._cov[2][2] += abs(dth)*reading.dt()*0.1
+        self._cov = np.matmul(np.matmul(change_matrix, self._cov), change_matrix.transpose())
+        self._cov += reading.get_cov_input_uncertainty(prev_pose)
 
         self._x.append(next_pose.x())
         self._y.append(next_pose.y())
@@ -55,20 +52,33 @@ class Robot:
     def map_update(self, scan: Scan):
         latest_pose = self.get_latest_pose()
         scan_pose, cov = self._map.get_scan_match(scan, latest_pose)
-        print("scan_pose and cov: ", scan_pose, cov)
+        print("poses: ", scan_pose, " vs ", latest_pose)
+        print("Scan cov: ")
+        print(cov)
+        print("robot cov: ", self._cov)
 
         K_sample_points = 10
-        guesses = np.random.multivariate_normal([0, 0, 0], cov, K_sample_points)
+        guesses = np.random.multivariate_normal([0.0, 0.0, 0.0], cov, K_sample_points)
         dx, dy, dth = guesses[:, 0], guesses[:, 1], guesses[:, 2]
 
         # TODO: Use the uncertainty in odometry to determine whether a sample point is used.
+        selected_points = [np.add(scan_pose, (dx[i], dy[i], dth[i])) for i in range(len(dx))]
+        
+        print("Guesses")
+        print(selected_points)
+        print("Points")
+        print([np.abs([p[0] - latest_pose.x(), p[1] - latest_pose.y(), p[2] - latest_pose.theta()]) for p in selected_points])
+        print("Expected")
+        print([4*self._cov[0][0], 4*self._cov[1][1], 4*self._cov[2][2]])
         selected_points = [
-            np.add(scan_pose, (dx[i], dy[i], dth[i])) for i in range(len(dx))
-                if abs(dx[i]) < 2*self._cov[0][0] and abs(dy[i]) < 2*self._cov[1][1] and abs(dth[i]) < 2*self._cov[2][2]
+            p for p in selected_points
+                if abs(p[0] - latest_pose.x()) < 4*self._cov[0][0] and 
+                    abs(p[1] - latest_pose.y()) < 4*self._cov[1][1] and 
+                    abs(p[2] - latest_pose.theta()) < 4*self._cov[2][2]
         ]
         print("# k-points: " + str(len(selected_points)))
         # TODO: Get the predicted position below
-        predicted_odd_mean = np.add([latest_pose.x(), latest_pose.y(), latest_pose.theta()], [0.0, 0.0, 0.0])
+        predicted_odd_mean = [latest_pose.x(), latest_pose.y(), latest_pose.theta()]
         predicted_odd_cov = self._cov
         
         ksample_weights = self._generate_sample_weight(selected_points, predicted_odd_mean, predicted_odd_cov, scan)
@@ -80,21 +90,19 @@ class Robot:
             mean = np.add(mean, selected_points[i] * ksample_weights[i])
             norm = norm + ksample_weights[i]
         
-        if (abs(norm) < 0.0000001):
-            if len(selected_points) == 0:
-                mean = predicted_odd_mean
-                sigma = predicted_odd_cov
-            else:
-                return
+        if (abs(norm) < 0.0000001 or len(selected_points) < 5):
+            mean = predicted_odd_mean
+            sigma = predicted_odd_cov
         else:
             mean = mean/norm
             for i in range(len(selected_points)):
-                delta = np.add(selected_points[i], -mean)
-                sigma = sigma + delta*delta.T*ksample_weights[i]
-            sigma = sigma/norm
+                delta_pos = np.matrix(np.add(selected_points[i], -mean))
+                sigma = sigma + delta_pos.T*delta_pos*ksample_weights[i]
+            sigma = np.array(sigma)/norm
+            print("AAAAAAAAAAAAAAAAAAAA")
 
         print("norm: " + str(norm) + " mean: " + str(mean))
-        # TODO: Make x a distribution and use sigma as the uncertainty
+        print("sigma: ", sigma)
         mean_pose = Pose(mean[0], mean[1], mean[2])
         self._cov = sigma
         self._x.append(mean_pose.x())
@@ -108,6 +116,10 @@ class Robot:
             motion_model = scipy.multivariate_normal(predicted_odd_mean, predicted_odd_cov)
         except np.linalg.LinAlgError:
             return np.zeros(len(selected_points), dtype=np.longdouble)
+        except:
+            print("failed with mean: ", predicted_odd_mean)
+            print("failed with cov: ", predicted_odd_cov)
+            raise
 
         ksample_weights = np.zeros(len(selected_points), dtype=np.longdouble)
         for i in range(len(selected_points)):

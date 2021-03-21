@@ -17,10 +17,20 @@ class IMUData:
     @abstractclassmethod
     def load_and_format(self) -> Tuple[np.ndarray, np.ndarray]:
         pass
-    
+
     @staticmethod
     @abstractclassmethod
     def progress_pose(prev_pose: Pose, reading: Reading) -> Pose:
+        pass
+
+    @staticmethod
+    @abstractclassmethod
+    def get_cov_input_uncertainty(prev_pose: Pose, reading: Reading) -> np.ndarray:
+        pass
+
+    @staticmethod
+    @abstractclassmethod
+    def get_cov_change_matrix(prev_pose: Pose, reading: Reading) -> np.ndarray:
         pass
 
     def get_data(self):

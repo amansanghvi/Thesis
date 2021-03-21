@@ -2,7 +2,7 @@ from models import Pose, Reading
 from scipy.io import loadmat
 import numpy as np
 from IMUData import IMUData
-from math import sin, cos
+from math import sin, cos, pi
 
 NUM_REF_POINTS = 1000
 class DefaultIMUData(IMUData):
@@ -25,7 +25,27 @@ class DefaultIMUData(IMUData):
     @staticmethod
     def progress_pose(prev_pose: Pose, reading: Reading) -> Pose:
         theta = prev_pose.theta() + reading.dt()*reading.get_data()[1]
-        x = prev_pose.x() + reading.dt()*cos(theta)*reading.get_data()[0]
-        y = prev_pose.y() + reading.dt()*sin(theta)*reading.get_data()[0]
+        x = prev_pose.x() + reading.dt() * reading.get_data()[0] * cos(theta)
+        y = prev_pose.y() + reading.dt() * reading.get_data()[0] * sin(theta)
 
         return Pose(x, y, theta)
+
+    @staticmethod
+    def get_cov_change_matrix(prev_pose: Pose, reading: Reading) -> np.ndarray:
+        result = np.diag([1.0, 1.0, 1.0])
+        # 1.1 is just extra noise from the speed reading
+        result[0][2] = reading.dt() * reading.get_data()[0] * cos(prev_pose.theta())
+        result[1][2] = reading.dt() * reading.get_data()[0] * sin(prev_pose.theta())
+        return result
+    
+    @staticmethod
+    def get_cov_input_uncertainty(prev_pose: Pose, reading: Reading) -> np.ndarray:
+        sensor_uncertainty = np.array([
+            [reading.dt()*cos(prev_pose.theta()), 0], 
+            [reading.dt()*sin(prev_pose.theta()), 0], 
+            [0, reading.dt()]
+        ], dtype=np.longdouble)
+        magnitudes = np.diag([0.05**2, (pi/180/2)**2])
+        output_uncertainty_component = np.abs(np.matmul(np.matmul(sensor_uncertainty, magnitudes), sensor_uncertainty.transpose()))
+        noise_uncertainty_component = np.abs(np.diag([(0.01)**2, (0.01)**2, (0.2*pi/180)**2]))
+        return output_uncertainty_component + noise_uncertainty_component

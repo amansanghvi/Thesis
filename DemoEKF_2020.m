@@ -190,7 +190,7 @@ for i=1:Li,     % loop
     
     % then I calculate the new covarience, after the prediction P(K+1|K) = J*P(K|K)*J'+F*Pu*F'+Q;
     F = [Dt*cos(estimatesVector(3)) 0; Dt*sin(estimatesVector(3)) 0; 0 Dt];
-    P = J*P*J' + F*Pu*F'+ Q;
+    P = J*P*J' + F*d*F'+ Q;
     
     % so, here/now, the variable "Xe" contains "X^(k+1|k)"   ("X^" means "X hat", i.e. predicted expected value of X(k+1) )
     % and the variable "P" is "P(k+1|k)".

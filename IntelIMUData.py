@@ -19,3 +19,11 @@ class DefaultIMUData(IMUData):
     @staticmethod
     def progress_pose(prev_pose: Pose, reading: Reading):
         pass
+
+    @staticmethod
+    def get_cov_input_uncertainty(prev_pose: Pose, reading: Reading):
+        pass
+
+    @staticmethod
+    def get_cov_change_matrix(prev_pose: Pose, reading: Reading):
+        pass
