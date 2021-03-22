@@ -3,6 +3,7 @@ from typing import Any, List, Optional, Tuple, cast
 import matlab
 import matplotlib.pyplot as plt
 import numpy as np
+import sys
 
 from lidar import Scan
 from models import Pose, Position
@@ -10,6 +11,8 @@ from models import Pose, Position
 MAP_LENGTH = 10 # metres
 CELLS_PER_ROW = 100
 CELL_SIZE = MAP_LENGTH / CELLS_PER_ROW
+RELEVANT_POINT_DIST = 10.0
+OCCUPIED_POINT_THRESHOLD = 2.5
 
 class GridMap:
     _map = np.array([])
@@ -25,6 +28,7 @@ class GridMap:
             raise Exception("Cannot have map length less than 1m")
         dim = round(map_len/cell_size)
         self._map = np.zeros((dim, dim))
+        self._cell_size = cell_size
         self._map.fill(0.0)
         self._size = map_len
         self._matlab = matlab
@@ -93,11 +97,48 @@ class GridMap:
     
     def get_scan_match(self, scan: Scan, guess: Pose) -> Tuple[List[float], List[List[float]]]:
         ref_points = []
+        start_x, start_y = 0, 0
+        end_x, end_y = len(self._map), len(self._map)
+        default_return = ([guess.x(), guess.y(), guess.theta()], np.zeros((3, 3), dtype=np.float))
         
-        for x in range(0, len(self._map)):
-            for y in range(0, len(self._map)):
-                if (self._map[x][y] > 0.1):
-                    ref_points.append([ # TODO: Think this through
+        left_x = self.get_cell(guess.x() - RELEVANT_POINT_DIST, 0)
+        right_x = self.get_cell(guess.x() + RELEVANT_POINT_DIST, 0)
+        
+        if (left_x == None):
+            if (guess.x() > 0): # If the robot is 10+ m out of the map.
+                print("Guess is too far right at: ", guess, file=sys.stderr)
+                return default_return
+        else:
+            start_x = cast(Position, left_x).x
+        
+        if (right_x == None):
+            if (guess.x() < 0): # If the robot is 10+ m out of the map.
+                print("Guess is too far left at: ", guess, file=sys.stderr)
+                return default_return
+        else:
+            end_x = cast(Position, right_x).x
+
+        up_y = self.get_cell(0, guess.y() + RELEVANT_POINT_DIST)
+        down_y = self.get_cell(0, guess.y() - RELEVANT_POINT_DIST)
+
+        if (up_y == None):
+            if (guess.y() < 0): # If the robot is 10+ m out of the map.
+                print("Guess is too far down at: ", guess, file=sys.stderr)
+                return default_return
+        else:
+            end_y = cast(Position, up_y).y
+        
+        if (down_y == None):
+            if (guess.y() > 0): # If the robot is 10+ m out of the map.
+                print("Guess is too far up at: ", guess, file=sys.stderr)
+                return default_return
+        else:
+            start_y = cast(Position, down_y).y
+        
+        for x in range(start_x, end_x):
+            for y in range(start_y, end_y):
+                if (self._map[x][y] > OCCUPIED_POINT_THRESHOLD):
+                    ref_points.append([ 
                         self.index_to_distance(x), 
                         self.index_to_distance(y)
                     ])
@@ -155,7 +196,7 @@ class GridMap:
         y = []
         for i in range(0, len(self._map)):
             for j in range(0, len(self._map)):
-                if self._map[i][j] > 1.0:
+                if self._map[i][j] > OCCUPIED_POINT_THRESHOLD:
                     x.append(i - len(self._map)/2)
                     y.append(j - len(self._map)/2) 
         return x, y

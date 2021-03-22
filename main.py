@@ -66,9 +66,9 @@ if __name__ == "__main__":
             plt.pause(0.001)
 
     map.show()
+    ax.set_title("COMPLETED")
     plt.show()
     print("ENDED")
-    ax.set_title("COMPLETED")
     fig.canvas.draw_idle()
     plt.pause(6000)
     # lidar_data.show_all()
