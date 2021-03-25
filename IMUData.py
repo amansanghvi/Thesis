@@ -11,7 +11,7 @@ class IMUData:
         super().__init__()
         self._data, self._times = self.load_and_format()
         assert(self._data.shape[0] > 2)
-        assert(self._data.shape[1] == 2)
+        assert(self._data.shape[1] < 5)
         assert(len(self._times.shape) == 1)
 
     @abstractclassmethod

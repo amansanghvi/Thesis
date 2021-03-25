@@ -41,8 +41,8 @@ class Pose:
 
 class Reading:
     _dt = 0.0
-    def __init__(self, 
-        data, timestamp: int, 
+    def __init__(self, data, 
+        timestamp: int, 
         progress_fnc: Callable[[Pose, Any], Pose],
         get_cov_change_matrix_fnc: Callable[[Pose, Any], np.ndarray],
         get_cov_input_uncertainty: Callable[[Pose, Any], np.ndarray]

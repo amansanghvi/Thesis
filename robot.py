@@ -57,13 +57,13 @@ class Robot:
         print(cov)
         print("robot cov: ", self._cov)
 
-        K_sample_points = 10
+        K_sample_points = 20
         guesses = np.random.multivariate_normal([0.0, 0.0, 0.0], cov, K_sample_points)
         dx, dy, dth = guesses[:, 0], guesses[:, 1], guesses[:, 2]
 
         # TODO: Use the uncertainty in odometry to determine whether a sample point is used.
         selected_points = [np.add(scan_pose, (dx[i], dy[i], dth[i])) for i in range(len(dx))]
-        
+
         print("Guesses")
         print(selected_points)
         print("Points")
@@ -80,23 +80,23 @@ class Robot:
         # TODO: Get the predicted position below
         predicted_odd_mean = [latest_pose.x(), latest_pose.y(), latest_pose.theta()]
         predicted_odd_cov = self._cov
-        
+
         ksample_weights = self._generate_sample_weight(selected_points, predicted_odd_mean, predicted_odd_cov, scan)
-        
+
         mean = np.zeros(3, dtype=np.longdouble)
         sigma = np.zeros((3, 3), dtype=np.longdouble)
         norm = np.longdouble(0.0)
         for i in range(len(selected_points)):
             mean = np.add(mean, selected_points[i] * ksample_weights[i])
             norm = norm + ksample_weights[i]
-        
-        if (abs(norm) < 0.0000001 or len(selected_points) < 5):
+
+        if (abs(norm) < 0.0000001 or len(selected_points) < 10):
             mean = predicted_odd_mean
             sigma = predicted_odd_cov
         else:
             mean = mean/norm
             for i in range(len(selected_points)):
-                delta_pos = np.matrix(np.add(selected_points[i], -mean))
+                delta_pos = np.matrix(np.add(selected_points[i], -mean))*10.0
                 sigma = sigma + delta_pos.T*delta_pos*ksample_weights[i]
             sigma = np.array(sigma)/norm
             print("AAAAAAAAAAAAAAAAAAAA")

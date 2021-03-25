@@ -21,7 +21,7 @@ class DefaultIMUData(IMUData):
         times = np.array([x for x in imu_data["IMU"]['times'][0][0][0]])
         
         return np.vstack((speed, omega)).transpose(), times
-    
+
     @staticmethod
     def progress_pose(prev_pose: Pose, reading: Reading) -> Pose:
         theta = prev_pose.theta() + reading.dt()*reading.get_data()[1]
@@ -37,7 +37,7 @@ class DefaultIMUData(IMUData):
         result[0][2] = reading.dt() * reading.get_data()[0] * cos(prev_pose.theta())
         result[1][2] = reading.dt() * reading.get_data()[0] * sin(prev_pose.theta())
         return result
-    
+
     @staticmethod
     def get_cov_input_uncertainty(prev_pose: Pose, reading: Reading) -> np.ndarray:
         sensor_uncertainty = np.array([

@@ -1,20 +1,21 @@
 from math import pi
+from typing import Tuple
 
 import numpy as np
 
 from LidarData import LidarData
-from models import time_to_timestamp
 
 POINTS_PER_SCAN = 180
 
-class DefaultLidarData(LidarData):
+class IntelLidarData(LidarData):
 
-    def load_and_format(self):
-        with open("./data/intel_LASER_.txt") as readFile:
+    def load_and_format(self) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+        with open("./data/intel.txt") as readFile:
             content = readFile.read().splitlines()
-            scans = np.array([list(map(float, line.split())) for line in content])
-            times = np.array([time_to_timestamp(x) for x in range(len(scans))])
+            lines = [line.split() for line in content if line.startswith("FLASER")]
+            scans = np.array([list(map(float, line[2:(POINTS_PER_SCAN + 2)])) for line in lines])
+            times = np.array([int(10*float(line[-3]))*10 for line in lines])
             # [-pi/2, pi/2]
-            angles = np.array(-pi/2 + i*pi/179 for i in range(POINTS_PER_SCAN)) 
+            angles = np.array([-pi/2 + i*pi/179 for i in range(POINTS_PER_SCAN)]) 
             return times, scans, angles
         

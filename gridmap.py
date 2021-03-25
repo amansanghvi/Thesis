@@ -12,17 +12,17 @@ MAP_LENGTH = 10 # metres
 CELLS_PER_ROW = 100
 CELL_SIZE = MAP_LENGTH / CELLS_PER_ROW
 RELEVANT_POINT_DIST = 10.0
-OCCUPIED_POINT_THRESHOLD = 2.5
+OCCUPIED_POINT_THRESHOLD = 0.5
 
 class GridMap:
     _map = np.array([])
     _size = 0 # in metres
     _matlab: Any = None
-    log_odds_occ = 1.0 # Around 80% chance of lidar being right about which cell.
+    log_odds_occ = 0.40
     log_odds_nearby = 0.20
     max_odds_occ = 3.0  # Can only be at most ~95% confident on occupancy.
-    log_odds_emp = -0.45  # Probability of 0.2.
-    min_odds_emp = -2.2  # Can only be at most ~90% sure a cell is empty.
+    log_odds_emp = -0.30  # Probability of 0.2.
+    min_odds_emp = -3.0  # Can only be at most ~90% sure a cell is empty.
     def __init__(self, matlab, map_len=MAP_LENGTH, cell_size=CELL_SIZE):
         if map_len < 1:
             raise Exception("Cannot have map length less than 1m")
@@ -73,7 +73,7 @@ class GridMap:
                         self._map[point[0]][point[1]] + self.log_odds_occ, 
                         self.max_odds_occ
                     )
-                    prev_x, prev_y = points_to_update[j-1 if j > 0 else 1] # If endpoint is first for some reason, 
+                    prev_x, prev_y = points_to_update[j-1 if j > 0 else 0] # If endpoint is first for some reason, 
                     self._map[prev_x][prev_y] += self.log_odds_nearby
                 else:
                     self._map[point[0]][point[1]] = max(
