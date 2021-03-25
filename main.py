@@ -53,7 +53,7 @@ if __name__ == "__main__":
 
         imu_reading = imu_data[imu_idx]
         if imu_reading.timestamp() == t:
-            dt = timestamp_to_time(imu_reading.timestamp() - prev_timestamp)
+            dt = imu_reading.timestamp() - prev_timestamp
             imu_reading.set_dt(dt)
             robot.imu_update(imu_reading)
             prev_timestamp = imu_reading.timestamp()

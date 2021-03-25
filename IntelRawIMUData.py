@@ -23,19 +23,25 @@ class IntelRawIMUData(IMUData):
             imu_pos = np.array([reading - calibrated_mean for reading in imu_data])
             real_times = np.column_stack((sorted_times, sorted_times, sorted_times))
 
-            imu_vel = 1e5*np.diff(imu_pos[idxs], axis=0)/np.diff(real_times, axis=0)
-            return imu_pos[idxs], sorted_times
+            imu_vel = 1e4*np.diff(imu_pos[idxs], axis=0)/np.diff(real_times, axis=0)
+            # return imu_pos, sorted_times
+            return np.vstack(([0.0, 0.0, 0.0], imu_vel)), sorted_times
 
     @staticmethod
     def progress_pose(prev_pose: Pose, reading: Reading) -> Pose:
         data = reading.get_data()
-        return Pose(data[0], data[1], data[2])
+        dt = reading.dt()/1e4
+        return Pose(
+            prev_pose.x() + data[0]*dt, 
+            prev_pose.y() + data[1]*dt, 
+            prev_pose.theta() + data[2]*dt
+        )
 
     @staticmethod
     def get_cov_input_uncertainty(prev_pose: Pose, reading: Reading) -> np.ndarray:
         result = np.diag([1.0, 1.0, 1.0])
-        result[0][2] = reading.get_data()[0] - prev_pose.x()
-        result[1][2] = reading.get_data()[1] - prev_pose.y()
+        result[0][2] = reading.get_data()[0]*reading.dt()
+        result[1][2] = reading.get_data()[1]*reading.dt()
         return result
 
     @staticmethod

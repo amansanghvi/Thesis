@@ -76,8 +76,7 @@ class Scan:
     def __init__(self, ranges: np.ndarray, angles: np.ndarray, timestamp: int):
         if isinstance(ranges, np.ndarray):
             self._x = np.array([ranges[i]*cos(angles[i]) for i in range(len(ranges))])
-            self._y = np.array([ranges[i]*sin(angles[i]) + 0.46 for i in range(len(ranges))])
-        self._time = timestamp_to_time(timestamp)
+            self._y = np.array([ranges[i]*sin(angles[i]) for i in range(len(ranges))])
         self._timestamp = timestamp
 
     def x(self) -> np.ndarray:
@@ -85,9 +84,6 @@ class Scan:
 
     def y(self) -> np.ndarray:
         return self._y
-
-    def time(self) -> float:
-        return self._time
 
     def timestamp(self) -> int:
         return self._timestamp
@@ -101,7 +97,7 @@ class Scan:
         return len(self._x)
     
     def __str__(self) -> str:
-        return "Scan Class: " + str(len(self._x)) + " points at timestamp: " + str(self._time)
+        return "Scan Class: " + str(len(self._x)) + " points at timestamp: " + str(self._timestamp)
         
     def __iter__(self) -> Position:
         self.n = 0
