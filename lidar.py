@@ -109,11 +109,11 @@ class Scan:
         return self[self.n]
     
     def from_global_reference(self, frame: Pose): 
-        # returns coordinates of points from global frame of reference 
+        # returns Scan with coordinates of points from global frame of reference 
         # given lidar pose in global reference frame.
         t_mat = [ # transformation matrix
             [cos(frame.theta()), -sin(frame.theta()), frame.x()], 
-            [ sin(frame.theta()), cos(frame.theta()), frame.y()], 
+            [sin(frame.theta()),  cos(frame.theta()), frame.y()], 
             [                  0,                  0,         1],
         ]
         curr_positions = np.vstack(

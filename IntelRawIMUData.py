@@ -22,9 +22,12 @@ class IntelRawIMUData(IMUData):
             calibrated_mean = np.mean(imu_data[0:5], axis=0)
             imu_pos = np.array([reading - calibrated_mean for reading in imu_data])
             real_times = np.column_stack((sorted_times, sorted_times, sorted_times))
-
             imu_vel = 1e4*np.diff(imu_pos[idxs], axis=0)/np.diff(real_times, axis=0)
-            # return imu_pos, sorted_times
+
+            print("Velocities")
+            for vel in imu_vel:
+                print(vel) 
+
             return np.vstack(([0.0, 0.0, 0.0], imu_vel)), sorted_times
 
     @staticmethod
@@ -38,12 +41,15 @@ class IntelRawIMUData(IMUData):
         )
 
     @staticmethod
-    def get_cov_input_uncertainty(prev_pose: Pose, reading: Reading) -> np.ndarray:
+    def get_cov_change_matrix(prev_pose: Pose, reading: Reading) -> np.ndarray:
         result = np.diag([1.0, 1.0, 1.0])
-        result[0][2] = reading.get_data()[0]*reading.dt()
-        result[1][2] = reading.get_data()[1]*reading.dt()
         return result
 
     @staticmethod
-    def get_cov_change_matrix(prev_pose: Pose, reading: Reading) -> np.ndarray:
-        return np.abs(np.diag([(0.01)**2, (0.01)**2, (0.2*pi/180)**2]))
+    def get_cov_input_uncertainty(prev_pose: Pose, reading: Reading) -> np.ndarray:
+        dt = reading.dt()/1e4
+        return np.abs(np.diag([
+            (0.002 + 0.05*abs(reading._data[0])*dt)**2,
+            (0.002 + 0.05*abs(reading._data[1])*dt)**2,
+            (0.01*pi/180 + 0.05*abs(reading._data[2])*dt)**2
+        ])) 

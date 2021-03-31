@@ -34,7 +34,7 @@ class Pose:
         return self._theta
 
     def __str__(self):
-        return "Pose: (" + str(self._x)  + ", " + str(self._y) + ") at " + str(self._theta*180/pi) + " degrees"
+        return "Pose: (" + str(self._x)  + ", " + str(self._y) + ", " + str(self._theta) + ")"
 
     def pos(self) -> Position:
         return Position(self._x, self._y)

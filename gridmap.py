@@ -1,4 +1,4 @@
-from typing import Any, List, Optional, Tuple, cast
+from typing import Any, List, Optional, Tuple, Union, cast
 
 import matlab
 import matplotlib.pyplot as plt
@@ -12,13 +12,13 @@ MAP_LENGTH = 10 # metres
 CELLS_PER_ROW = 100
 CELL_SIZE = MAP_LENGTH / CELLS_PER_ROW
 RELEVANT_POINT_DIST = 10.0
-OCCUPIED_POINT_THRESHOLD = 0.5
+OCCUPIED_POINT_THRESHOLD = 1.0
 
 class GridMap:
     _map = np.array([])
     _size = 0 # in metres
     _matlab: Any = None
-    log_odds_occ = 0.40
+    log_odds_occ = 0.80
     log_odds_nearby = 0.20
     max_odds_occ = 3.0  # Can only be at most ~95% confident on occupancy.
     log_odds_emp = -0.30  # Probability of 0.2.
@@ -44,7 +44,7 @@ class GridMap:
     def __str__(self) -> str:
         return "Map: " + str(len(self._map)) + "x" + str(len(self._map[0])) + " cells"
     
-    def get_pr_at(self, pos: Position):
+    def get_pr_at(self, pos: Position) -> Optional[float]:
         cell = self.get_cell(pos.x, pos.y)
         if cell == None:
             return None
@@ -81,7 +81,7 @@ class GridMap:
                         self.min_odds_emp
                     )
         return self
-    
+
     # Input is GLOBAL x and y in metres
     def get_cell(self, x: float, y: float) -> Optional[Position]:
         if y <= -self._size/2 or y >= self._size/2:
@@ -94,72 +94,81 @@ class GridMap:
             int(x/self._size * len(self._map) + len(self._map)/2), 
             int(y/self._size * len(self._map) + len(self._map)/2)
         )
-    
-    def get_scan_match(self, scan: Scan, guess: Pose) -> Tuple[List[float], List[List[float]]]:
-        ref_points = []
-        start_x, start_y = 0, 0
-        end_x, end_y = len(self._map), len(self._map)
-        default_return = ([guess.x(), guess.y(), guess.theta()], np.zeros((3, 3), dtype=np.float))
+
+    def get_nearby_occ_points(self, curr_cell: Position) -> np.ndarray:
+        pos_range = int(1.5/self._cell_size)
+        result = []
         
+        start_x = max(0, curr_cell.x-pos_range)
+        start_y = max(0, curr_cell.y-pos_range)
+        end_x = min(len(self._map), curr_cell.x+pos_range)
+        end_y = min(len(self._map), curr_cell.y+pos_range)
+
+        for x in range(start_x, end_x):
+            for y in range(start_y, end_y):
+                if self._map[x][y] > OCCUPIED_POINT_THRESHOLD:
+                    result.append([self.index_to_distance(x), self.index_to_distance(y)])
+        return result
+    
+    def get_scan_match(self, rel_scan: Scan, prev_scan: Scan, guess: Pose, pose_range: np.ndarray) -> Tuple[List[float], List[List[float]], float]:
+        default_return = ([guess.x(), guess.y(), guess.theta()], np.zeros((3, 3), dtype=np.float), 0.0)
+        scan = rel_scan.from_global_reference(guess)
+
         left_x = self.get_cell(guess.x() - RELEVANT_POINT_DIST, 0)
         right_x = self.get_cell(guess.x() + RELEVANT_POINT_DIST, 0)
-        
-        if (left_x == None):
-            if (guess.x() > 0): # If the robot is 10+ m out of the map.
-                print("Guess is too far right at: ", guess, file=sys.stderr)
-                return default_return
-        else:
-            start_x = cast(Position, left_x).x
-        
-        if (right_x == None):
-            if (guess.x() < 0): # If the robot is 10+ m out of the map.
-                print("Guess is too far left at: ", guess, file=sys.stderr)
-                return default_return
-        else:
-            end_x = cast(Position, right_x).x
-
         up_y = self.get_cell(0, guess.y() + RELEVANT_POINT_DIST)
         down_y = self.get_cell(0, guess.y() - RELEVANT_POINT_DIST)
 
-        if (up_y == None):
-            if (guess.y() < 0): # If the robot is 10+ m out of the map.
-                print("Guess is too far down at: ", guess, file=sys.stderr)
+        if ((left_x == None and guess.x() > 0) or (right_x == None and guess.x() < 0)
+            or (up_y == None and guess.y() < 0) or (down_y == None and guess.y() > 0)):
+                print("Guess is too far out at: ", guess, file=sys.stderr)
                 return default_return
-        else:
-            end_y = cast(Position, up_y).y
-        
-        if (down_y == None):
-            if (guess.y() > 0): # If the robot is 10+ m out of the map.
-                print("Guess is too far up at: ", guess, file=sys.stderr)
-                return default_return
-        else:
-            start_y = cast(Position, down_y).y
-        
-        for x in range(start_x, end_x):
-            for y in range(start_y, end_y):
-                if (self._map[x][y] > OCCUPIED_POINT_THRESHOLD):
-                    ref_points.append([ 
-                        self.index_to_distance(x), 
-                        self.index_to_distance(y)
-                    ])
+
         curr_points = []
+        ref_points = []
+        # for i in range(0, len(scan)):
+        #     curr_cell = self.get_cell(scan.x()[i], scan.y()[i])
+        #     if (curr_cell == None):
+        #         continue
+        #     curr_cell = cast(Position, curr_cell)
+        #     curr_points.append([
+        #         self.index_to_distance(curr_cell.x), 
+        #         self.index_to_distance(curr_cell.y)
+        #     ])
+        #     nearby_points = self.get_nearby_occ_points(curr_cell)
+        #     if (len(nearby_points) != 0):
+        #         ref_points.extend(nearby_points)
+        # curr_adjusted_points = [[p[0] - guess.x(), p[1] - guess.y()] for p in curr_points]
+        # unique_ref_points = [[p[0] - guess.x(), p[1] - guess.y()] for p in np.unique(ref_points, axis=0)]
         for i in range(0, len(scan)):
-            curr_cell = self.get_cell(scan.x()[i], scan.y()[i])
-            if (curr_cell == None):
-                continue
-            curr_cell = cast(Position, curr_cell)
-            curr_points.append([
-                self.index_to_distance(curr_cell.x), 
-                self.index_to_distance(curr_cell.y)
-            ])
-        p, cov = self._matlab.matchScanCustom(
-            matlab.double(curr_points),
-            matlab.double(ref_points),
-            matlab.double([guess.x(), guess.y(), guess.theta()]),
-            nargout=2
-        )
-        return p[0], cov
-    
+            curr_points.append([scan.x()[i], scan.y()[i]])
+        for i in range(0, len(prev_scan)):
+            ref_points.append([prev_scan.x()[i], prev_scan.y()[i]])
+        curr_adjusted_points = [[p[0] - guess.x(), p[1] - guess.y()] for p in curr_points]
+        unique_ref_points = [[p[0] - guess.x(), p[1] - guess.y()] for p in ref_points]
+        print("curr_points", len(curr_adjusted_points), " : ", curr_adjusted_points)
+        print("ref_points", len(unique_ref_points), " : ", unique_ref_points)
+        print("guess", guess.theta())
+        print("resolution", int(1.0/self._cell_size))
+        print("range", pose_range)
+        try:
+            p, cov, score = self._matlab.matchScanCustom(
+                matlab.double(curr_adjusted_points),
+                matlab.double(unique_ref_points if len(unique_ref_points) > 0 else [[]]),
+                matlab.double([0.0, 0.0, 0.0]),
+                int(1.0/self._cell_size), # Passing value as double
+                matlab.double([pose_range[0], pose_range[1], np.pi/6]),
+                nargout=3
+            )
+            p[0][0] += guess.x()
+            p[0][1] += guess.y()
+            return p[0], cov, score
+        except:
+            print("@@@@@@@@@@@@@@@@@@@@@@@@")
+            print("@@@@@@@ ERRRRRRR @@@@@@@")
+            print("@@@@@@@@@@@@@@@@@@@@@@@@")
+            raise
+
     @staticmethod
     def get_affected_points(x0: int, y0: int, x1: int, y1: int) -> List[Tuple[int, int]]:
         dx = abs(x1 - x0)
@@ -190,7 +199,7 @@ class GridMap:
         return result
         
     # Does not gives accurate position. 
-    # Distances between points are arbitrarily scaled.
+    # Uses an arbitrary unit of distance.
     def get_occupied_points(self):
         x = []
         y = []
