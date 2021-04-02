@@ -36,13 +36,12 @@ if __name__ == "__main__":
     
     robot._map.update(robot.get_latest_pose(), lidar_data[0])
     robot._map.update(robot.get_latest_pose(), lidar_data[0])
-    # print(map.get_scan_match(lidar_data[1800]))
-    
+
     print(robot)
     print(lidar_data)
     print(imu_data)
     print(map)
-    
+
     prev_timestamp = imu_data[0].timestamp()
     imu_idx = 0
     lidar_idx = 0
@@ -74,7 +73,6 @@ if __name__ == "__main__":
         if lidar_data.timestamp_for_idx(lidar_idx) == t:
             lidar_reading = lidar_data[lidar_idx]
             lidar_idx = min(lidar_idx + 1, len(lidar_data)-1)
-            # map.update(robot.get_latest_pose(), lidar_reading)
             print("#################################")
             print("Frame: ", plotFrameNumber, " IMU: ", imu_idx)
             curr_pose = robot.get_latest_pose()
@@ -82,6 +80,7 @@ if __name__ == "__main__":
             dth = abs(last_updated_pose.theta() - curr_pose.theta())
             if (update_count < MAX_UPDATE_COUNT or (dist >= DIST_THRESHOLD or dth >= ROT_THRESHOLD)):
                 robot.map_update(lidar_reading, last_scan)
+                # robot._map.update(robot.get_latest_pose(), lidar_reading)
                 if (dist >= DIST_THRESHOLD or dth >= ROT_THRESHOLD):
                     update_count = 0
                     last_updated_pose = curr_pose
@@ -91,7 +90,6 @@ if __name__ == "__main__":
                 plot_scan = last_scan
                 sc_scan.set_offsets(np.c_[plot_scan.x()/robot._map._cell_size, plot_scan.y()/robot._map._cell_size])
                 plot_x, plot_y = robot._map.get_occupied_points()
-                # plot_x, plot_y = map.get_occupied_points()
                 sc.set_offsets(np.c_[plot_x, plot_y])
 
             line.set_data(np.array(robot.x())/robot._map._cell_size, np.array(robot.y())/robot._map._cell_size)
