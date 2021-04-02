@@ -126,6 +126,23 @@ class GridMap:
 
         curr_points = []
         ref_points = []
+
+        # ORIGINAL ALGORITHM
+        # for i in range(0, len(scan)):
+        #     curr_cell = self.get_cell(scan.x()[i], scan.y()[i])
+        #     if (curr_cell == None):
+        #         continue
+        #     curr_cell = cast(Position, curr_cell)
+        #     curr_points.append([
+        #         self.index_to_distance(curr_cell.x), 
+        #         self.index_to_distance(curr_cell.y)
+        #     ])
+        #     nearby_points = self.get_nearby_occ_points(curr_cell)
+        #     if (len(nearby_points) != 0):
+        #         ref_points.extend(nearby_points)
+        # curr_adjusted_points = [[p[0] - guess.x(), p[1] - guess.y()] for p in curr_points]
+        # unique_ref_points = [[p[0] - guess.x(), p[1] - guess.y()] for p in np.unique(ref_points, axis=0)]
+
         for i in range(0, len(scan)):
             curr_points.append([scan.x()[i], scan.y()[i]])
         for i in range(0, len(prev_scan)):
