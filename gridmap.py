@@ -146,22 +146,26 @@ class GridMap:
             ref_points.append([prev_scan.x()[i], prev_scan.y()[i]])
         curr_adjusted_points = [[p[0] - guess.x(), p[1] - guess.y()] for p in curr_points]
         unique_ref_points = [[p[0] - guess.x(), p[1] - guess.y()] for p in ref_points]
-        print("curr_points", len(curr_adjusted_points), " : ", curr_adjusted_points)
-        print("ref_points", len(unique_ref_points), " : ", unique_ref_points)
+        valid_ref_points = [[p[0], p[1]] for p in unique_ref_points if np.sqrt(p[0]**2 + p[1]**2) < 11.0]
+        valid_curr_points = [[p[0], p[1]] for p in curr_adjusted_points if np.sqrt(p[0]**2 + p[1]**2) < 11.0]
+        print("curr_points", len(valid_curr_points), " : ", valid_curr_points)
+        print("ref_points", len(valid_ref_points), " : ", valid_ref_points)
         print("guess", guess.theta())
         print("resolution", int(1.0/self._cell_size))
         print("range", pose_range)
         try:
             p, cov, score = self._matlab.matchScanCustom(
-                matlab.double(curr_adjusted_points),
-                matlab.double(unique_ref_points if len(unique_ref_points) > 0 else [[]]),
+                matlab.double(valid_curr_points),
+                matlab.double(valid_ref_points if len(valid_ref_points) > 0 else [[]]),
                 matlab.double([0.0, 0.0, 0.0]),
                 int(1.0/self._cell_size), # Passing value as double
                 matlab.double([pose_range[0], pose_range[1], np.pi/6]),
                 nargout=3
             )
+            print("Original returned pose: ", p[0])
             p[0][0] += guess.x()
             p[0][1] += guess.y()
+            p[0][2] += guess.theta()
             return p[0], cov, score
         except:
             print("@@@@@@@@@@@@@@@@@@@@@@@@")

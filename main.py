@@ -24,7 +24,7 @@ from robot import Robot
 
 MAX_UPDATE_COUNT = 2
 ROT_THRESHOLD = pi/9
-DIST_THRESHOLD = 0.3
+DIST_THRESHOLD = 0.1
 
 if __name__ == "__main__":
     eng = matlab.engine.connect_matlab()
