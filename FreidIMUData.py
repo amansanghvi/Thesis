@@ -24,9 +24,9 @@ class FreidIMUData(IMUData):
             real_times = np.column_stack((sorted_times, sorted_times, sorted_times))
             imu_vel = 1e4*np.diff(imu_pos[idxs], axis=0)/np.diff(real_times, axis=0)
             adj_vel = np.array([[v[0], v[1], 0.0] if abs(v[2]) < 0.08 else v for v in imu_vel])
-            print("Velocities")
-            for vel in imu_vel:
-                print(vel) 
+            # print("Velocities")
+            # for vel in imu_vel:
+            #     print(vel) 
 
             return np.vstack(([0.0, 0.0, 0.0], imu_vel)), sorted_times
 

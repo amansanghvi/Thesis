@@ -29,8 +29,8 @@ DIST_THRESHOLD = 0.1
 if __name__ == "__main__":
     eng = matlab.engine.connect_matlab()
 
-    lidar_data = Lidar(IntelRawLidarData(), eng)
-    imu_data = IMU(IntelRawIMUData())
+    lidar_data = Lidar(FreidLidarData(), eng)
+    imu_data = IMU(FreidIMUData())
     map = GridMap(eng, 40, 0.1)
     robot = Robot(10, eng)
     
@@ -100,7 +100,7 @@ if __name__ == "__main__":
             fig.canvas.draw_idle()
             plt.pause(0.001)
 
-    map.show()
+    robot._map.show()
     ax.set_title("COMPLETED")
     plt.show()
     print("ENDED")

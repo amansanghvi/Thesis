@@ -19,6 +19,9 @@ function [pose, cov, score] = matchScanCustom(...
     if (isValidPose(pose, pose_guess, pose_range))
        cov = stats.Covariance;
        score = stats.Score;
+%        if (score/length(curr_points) > 0.5)
+%            return
+%        end
     else
         score = 0;
         cov = NaN(3);
@@ -26,14 +29,21 @@ function [pose, cov, score] = matchScanCustom(...
     end
     
     % Then use this one.
-    [pose, stats] = matchScans( ...
+    [new_pose, stats] = matchScans( ...
         lidarScan(curr_points),... 
         lidarScan(ref_points), ...
         'InitialPose', pose, ...
         'MaxIterations', 500, ...
         'CellSize', 0.1);
-    if (isValidPose(pose, pose_guess, pose_range))
-        score = stats.Score;
+    if (isValidPose(new_pose, pose_guess, pose_range))
+        if (stats.Score*2 > score)
+            score = stats.Score;
+            pose = new_pose;
+        else
+            return
+        end
+    elseif(isValidPose(pose, pose_guess, pose_range))
+        return
     else
         score = 0;
         cov = NaN(3);
