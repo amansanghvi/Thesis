@@ -3,6 +3,7 @@ from typing import List, cast
 import matplotlib.pyplot as plt
 import numpy as np
 import scipy.stats as scipy
+import copy
 
 from gridmap import GridMap
 from imu import Reading
@@ -12,17 +13,19 @@ from models import Pose
 MAP_LENGTH = 10 # metres
 CELLS_IN_ROW = 100
 CELL_SIZE = MAP_LENGTH / CELLS_IN_ROW
+NUM_SAMPLE_POINTS = 30
 
 class Robot:
     _x = [0.0]
     _y = [0.0]
     _theta = [0.0]
     _map: GridMap
-    _weight = [0.0]
+    _weight = [1.0]
     _cov = np.zeros((3, 3), dtype=np.longdouble)
-    def __init__(self, num_particles, matlab):
-        self._map = GridMap(matlab, 40, 0.05)
-        self._weight = [1.0/num_particles]
+    def __init__(self, matlab):
+        if (matlab != None):
+            self._map = GridMap(matlab, 50, 0.05)
+            self._weight = [1.0]
 
     def x(self) -> np.ndarray:
         return self._x
@@ -32,6 +35,9 @@ class Robot:
 
     def theta(self) -> np.ndarray:
         return self._theta
+    
+    def weight(self) -> np.ndarray:
+        return self._weight
 
     def get_latest_pose(self) -> Pose:
         return Pose(self._x[-1], self._y[-1], self._theta[-1])
@@ -68,16 +74,18 @@ class Robot:
         if (np.isnan(scan_cov).any()):
             print("BAD SCORE")
             self._map.update(latest_pose, scan)
+            weight_update = self._generate_sample_weight([[latest_pose.x(), latest_pose.y(), latest_pose.theta()]], scan)
+            self._weight.append(weight_update[0] * self._weight[-1])
             return
 
-        K_sample_points = 40
+        K_sample_points = NUM_SAMPLE_POINTS
         guesses = np.random.multivariate_normal(scan_pose, np.array(scan_cov), K_sample_points)
 
         # TODO: Workout when to use scan match and odometry.
         predicted_odd_mean = scan_pose # [latest_pose.x(), latest_pose.y(), latest_pose.theta()]
         predicted_odd_cov = self._cov
 
-        ksample_weights = self._generate_sample_weight(guesses, predicted_odd_mean, predicted_odd_cov, scan)
+        ksample_weights = self._generate_sample_weight(guesses, scan)
 
         print("Guesses")
         print(np.column_stack((guesses, ksample_weights)))
@@ -108,27 +116,18 @@ class Robot:
         self._x.append(mean_pose.x())
         self._y.append(mean_pose.y())
         self._theta.append(mean_pose.theta())
+        self._weight.append(norm*self._weight[-1])
         self._map.update(mean_pose, scan)
 
     
-    def _generate_sample_weight(self, guesses: np.ndarray, predicted_odd_mean, predicted_odd_cov, scan: Scan) -> List[float]:
-        try:
-            motion_model = scipy.multivariate_normal(predicted_odd_mean, predicted_odd_cov)
-        except np.linalg.LinAlgError:
-            return np.zeros(len(guesses), dtype=np.longdouble)
-        except:
-            print("failed with mean: ", predicted_odd_mean)
-            print("failed with cov: ", predicted_odd_cov)
-            raise
-
+    def _generate_sample_weight(self, guesses: np.ndarray, scan: Scan) -> List[float]:
         ksample_weights = np.zeros(len(guesses), dtype=np.longdouble)
         for i in range(len(guesses)):
             x_k = guesses[i]
             position_weight = 1.0  # motion_model.pdf(x_k)
-            # print("PDF max: ", motion_model.pdf([predicted_odd_mean]), "vs", motion_model.pdf(x_k))
             
             observation_weight = np.longdouble(1.0)
-            multiplier = 2.0
+            multiplier = 1.45
             adjusted_scan = scan.from_global_reference(Pose(x_k[0], x_k[1], x_k[2]))
             for j in range(len(adjusted_scan)):
                 beam = adjusted_scan[j]
@@ -140,9 +139,19 @@ class Robot:
                     else:
                         observation_weight *= cast(float, pr_occ)*multiplier # Arbitrary scaling applied (*10)
                 else:
-                    observation_weight += 5 # 0.5 * 10
+                    observation_weight *= 0.5*multiplier
             ksample_weights[i] = observation_weight * position_weight
         return ksample_weights
+
+    def copy(self):
+        new_robot = Robot(None)
+        new_robot._weight = self._weight.copy()
+        new_robot._x = self._x.copy()
+        new_robot._y = self._y.copy()
+        new_robot._theta = self._theta.copy()
+        new_robot._cov = copy.deepcopy(self._cov)
+        new_robot._map = self._map.copy()
+        return new_robot
 
     def __str__(self) -> str:   
         return "Robot at position: " + str(self.get_latest_pose())

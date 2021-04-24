@@ -1,6 +1,7 @@
 from typing import Any, List, Optional, Tuple, Union, cast
 
 import matlab
+import copy
 import matplotlib.pyplot as plt
 import numpy as np
 import sys
@@ -24,12 +25,13 @@ class GridMap:
     log_odds_emp = -0.30  # Probability of 0.2.
     min_odds_emp = -3.0  # Can only be at most ~90% sure a cell is empty.
     def __init__(self, matlab, map_len=MAP_LENGTH, cell_size=CELL_SIZE):
+        if (matlab == None and map_len == None and cell_size == None):
+            return
         if map_len < 1:
             raise Exception("Cannot have map length less than 1m")
         dim = round(map_len/cell_size)
         self._map = np.zeros((dim, dim))
         self._cell_size = cell_size
-        self._map.fill(0.0)
         self._size = map_len
         self._matlab = matlab
     
@@ -143,6 +145,7 @@ class GridMap:
         # curr_adjusted_points = [[p[0] - guess.x(), p[1] - guess.y()] for p in curr_points]
         # unique_ref_points = [[p[0] - guess.x(), p[1] - guess.y()] for p in np.unique(ref_points, axis=0)]
 
+        # NEW ALGORITHM
         for i in range(0, len(scan)):
             curr_points.append([scan.x()[i], scan.y()[i]])
         for i in range(0, len(prev_scan)):
@@ -219,6 +222,14 @@ class GridMap:
     
     def index_to_distance(self, i: int) -> float:
         return float(i - len(self._map)/2) * self._size/len(self._map)
+
+    def copy(self):
+        new_map = GridMap(None, None, None)
+        new_map._matlab = self._matlab
+        new_map._size = self._size
+        new_map._cell_size = self._cell_size
+        new_map._map = copy.deepcopy(self._map)
+        return new_map
 
     def show(self):
         x, y = self.get_occupied_points()
