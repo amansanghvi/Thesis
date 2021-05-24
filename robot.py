@@ -1,3 +1,4 @@
+from hybridmap import HybridMap
 from math import pi
 from typing import List, cast
 import matplotlib.pyplot as plt

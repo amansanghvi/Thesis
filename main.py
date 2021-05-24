@@ -25,7 +25,7 @@ from robot import Robot
 MAX_UPDATE_COUNT = 2
 ROT_THRESHOLD = pi/9
 DIST_THRESHOLD = 0.25
-NUM_PARTICLES = 5
+NUM_PARTICLES = 1
 
 def resample(particles: List[Robot]) -> List[Robot]:
     weights = np.array([p.weight()[-1] for p in particles])

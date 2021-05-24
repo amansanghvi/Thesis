@@ -83,6 +83,34 @@ class GridMap:
                         self.min_odds_emp
                     )
         return self
+    
+    def set_occupied(self, x: int, y: int):
+        self._map[x][y] = min(
+            self._map[x][y] + self.log_odds_occ, 
+            self.max_odds_occ
+        )
+    
+    def set_occupied_pos(self, x: float, y: float):
+        x_idx = int(x/self._cell_size + len(self._map)/2.0)
+        y_idx = int(y/self._cell_size + len(self._map)/2.0)
+        self.set_occupied(x_idx, y_idx)
+
+    def set_empty(self, x: int, y: int):
+        self._map[x][y] = max(
+            self._map[x][y] + self.log_odds_emp,
+            self.min_odds_emp
+        )
+
+    def set_empty_pos(self, x: float, y: float):
+        x_idx = int(x/self._cell_size + len(self._map)/2.0)
+        y_idx = int(y/self._cell_size + len(self._map)/2.0)
+        self.set_empty(x_idx, y_idx)
+    
+    def set_nearby(self, x: int, y: int):
+        self._map[x][y] = min(
+            self._map[x][y] + self.log_odds_nearby, 
+            self.max_odds_occ
+        )
 
     # Input is GLOBAL x and y in metres
     def get_cell(self, x: float, y: float) -> Optional[Position]:
@@ -130,28 +158,28 @@ class GridMap:
         ref_points = []
 
         # ORIGINAL ALGORITHM
-        # for i in range(0, len(scan)):
-        #     curr_cell = self.get_cell(scan.x()[i], scan.y()[i])
-        #     if (curr_cell == None):
-        #         continue
-        #     curr_cell = cast(Position, curr_cell)
-        #     curr_points.append([
-        #         self.index_to_distance(curr_cell.x), 
-        #         self.index_to_distance(curr_cell.y)
-        #     ])
-        #     nearby_points = self.get_nearby_occ_points(curr_cell)
-        #     if (len(nearby_points) != 0):
-        #         ref_points.extend(nearby_points)
-        # curr_adjusted_points = [[p[0] - guess.x(), p[1] - guess.y()] for p in curr_points]
-        # unique_ref_points = [[p[0] - guess.x(), p[1] - guess.y()] for p in np.unique(ref_points, axis=0)]
+        for i in range(0, len(scan)):
+            curr_cell = self.get_cell(scan.x()[i], scan.y()[i])
+            if (curr_cell == None):
+                continue
+            curr_cell = cast(Position, curr_cell)
+            curr_points.append([
+                self.index_to_distance(curr_cell.x), 
+                self.index_to_distance(curr_cell.y)
+            ])
+            nearby_points = self.get_nearby_occ_points(curr_cell)
+            if (len(nearby_points) != 0):
+                ref_points.extend(nearby_points)
+        curr_adjusted_points = [[p[0] - guess.x(), p[1] - guess.y()] for p in curr_points]
+        unique_ref_points = [[p[0] - guess.x(), p[1] - guess.y()] for p in np.unique(ref_points, axis=0)]
 
         # NEW ALGORITHM
-        for i in range(0, len(scan)):
-            curr_points.append([scan.x()[i], scan.y()[i]])
-        for i in range(0, len(prev_scan)):
-            ref_points.append([prev_scan.x()[i], prev_scan.y()[i]])
-        curr_adjusted_points = [[p[0] - guess.x(), p[1] - guess.y()] for p in curr_points]
-        unique_ref_points = [[p[0] - guess.x(), p[1] - guess.y()] for p in ref_points]
+        # for i in range(0, len(scan)):
+        #     curr_points.append([scan.x()[i], scan.y()[i]])
+        # for i in range(0, len(prev_scan)):
+        #     ref_points.append([prev_scan.x()[i], prev_scan.y()[i]])
+        # curr_adjusted_points = [[p[0] - guess.x(), p[1] - guess.y()] for p in curr_points]
+        # unique_ref_points = [[p[0] - guess.x(), p[1] - guess.y()] for p in ref_points]
         valid_ref_points = [[p[0], p[1]] for p in unique_ref_points if np.sqrt(p[0]**2 + p[1]**2) < 11.0]
         valid_curr_points = [[p[0], p[1]] for p in curr_adjusted_points if np.sqrt(p[0]**2 + p[1]**2) < 11.0]
         print("curr_points", len(valid_curr_points), " : ", valid_curr_points)
@@ -178,6 +206,31 @@ class GridMap:
             print("@@@@@@@ ERRRRRRR @@@@@@@")
             print("@@@@@@@@@@@@@@@@@@@@@@@@")
             raise
+
+    def get_occ_points_between(self, min_cnr: Position, max_cnr: Position) -> List[Tuple[float, float]]:
+        min_cnr_x = self.get_cell(min_cnr.x, 0.0)
+        min_cnr_y = self.get_cell(0.0, min_cnr.y)
+        max_cnr_x = self.get_cell(max_cnr.x, 0.0)
+        max_cnr_y = self.get_cell(0.0, max_cnr.y)
+
+        if (min_cnr_x == None and min_cnr.x > 0.0) or (min_cnr_y == None and min_cnr.y > 0.0):
+            return []
+        if (max_cnr_x == None and max_cnr.x < 0.0) or (max_cnr_y == None and max_cnr.y < 0.0):
+            return []
+
+        min_x = 0 if min_cnr_x == None else cast(Position, min_cnr_x).x
+        min_y = 0 if min_cnr_y == None else cast(Position, min_cnr_y).y
+        max_x = len(self._map) if max_cnr_x == None else cast(Position, max_cnr_x).x + 1
+        max_y = len(self._map) if max_cnr_y == None else cast(Position, max_cnr_y).y + 1
+
+        result: List[Tuple[float, float]] = []
+        for x in range(min_x, max_x):
+            for y in range(min_y, max_y):
+                if self._map[x][y] > OCCUPIED_POINT_THRESHOLD:
+                    result.append((self.index_to_distance(x), self.index_to_distance(y)))
+        return result
+
+
 
     @staticmethod
     def get_affected_points(x0: int, y0: int, x1: int, y1: int) -> List[Tuple[int, int]]:
@@ -220,6 +273,7 @@ class GridMap:
                     y.append(j - len(self._map)/2) 
         return x, y
     
+    # index to m from origin.
     def index_to_distance(self, i: int) -> float:
         return float(i - len(self._map)/2) * self._size/len(self._map)
 
