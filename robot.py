@@ -1,4 +1,3 @@
-from hybridmap import HybridMap
 from math import pi
 from typing import List, cast
 import matplotlib.pyplot as plt
@@ -7,6 +6,7 @@ import scipy.stats as scipy
 import copy
 
 from gridmap import GridMap
+from hybridmap import HybridMap
 from imu import Reading
 from lidar import Scan
 from models import Pose
@@ -20,12 +20,13 @@ class Robot:
     _x = [0.0]
     _y = [0.0]
     _theta = [0.0]
-    _map: GridMap
+    _map: HybridMap
     _weight = [1.0]
     _cov = np.zeros((3, 3), dtype=np.longdouble)
     def __init__(self, matlab):
         if (matlab != None):
-            self._map = GridMap(matlab, 50, 0.05)
+            # self._map = GridMap(matlab, 50, 0.05)
+            self._map = HybridMap(matlab)
             self._weight = [1.0]
 
     def x(self) -> np.ndarray:

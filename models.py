@@ -14,6 +14,8 @@ class Position:
     def __init__(self, _x, _y):
         self.x = _x
         self.y = _y
+    def __str__(self) -> str:
+        return "(" + str(self.x) + ", " + str(self.y) + ")"
 
 class Pose:
     _x = 0.0
@@ -33,7 +35,7 @@ class Pose:
     def theta(self) -> float:
         return self._theta
 
-    def __str__(self):
+    def __str__(self) -> str:
         return "Pose: (" + str(self._x)  + ", " + str(self._y) + ", " + str(self._theta) + ")"
 
     def pos(self) -> Position:

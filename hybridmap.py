@@ -1,4 +1,5 @@
 from math import ceil, floor
+from os import sched_get_priority_max
 from gridmap import GridMap
 from typing import Any, List, Optional, Tuple, Union, cast
 
@@ -44,7 +45,7 @@ class HybridMapEntry:
             self._max_y = centre.y + map_radius
 
     def is_in_map(self, pos: Position) -> bool:
-        return pos.x >= self._min_x and pos.x <= self._min_x and pos.y >= self._min_y and pos.y <= self._max_y
+        return pos.x >= self._min_x and pos.x < self._max_x and pos.y >= self._min_y and pos.y < self._max_y
     
     def map(self) -> GridMap:
         return self._map
@@ -62,7 +63,7 @@ class HybridMapEntry:
         self._map = new_entry._map.copy()
 class HybridMap:
     _cell_size = 0.05
-    _map_len_m = 10
+    _map_len_m = 40
     _maps: List[HybridMapEntry] = []
     def __init__(self, matlab):
         self._matlab = matlab
@@ -83,10 +84,29 @@ class HybridMap:
         return None
     
     def update(self, robot_pose: Pose, scan: Scan) -> Any:
+        print("Updating hybrid map")
         global_scan = scan.from_global_reference(robot_pose)
+        m = self.get_map_with_pos(robot_pose.pos(), None)
+        if (m == None):
+            return self
+        m = cast(HybridMapEntry, m)
+        # start_cell = m.map().get_cell(robot_pose.x() - m.centre().x, robot_pose.y() - m.centre().y)
+        # if (start_cell == None):
+        #     return self
+        # start_cell = cast(Position, start_cell)
+        # start_cell = Position(start_cell.x + int(m.centre().x/self._cell_size), start_cell.y + int(m.centre().y/self._cell_size))
         start_cell = Position(int(robot_pose.x()/self._cell_size), int(robot_pose.y()/self._cell_size))
         for i in range(0, len(global_scan)):
+            end_is_occ = True
+            dist = np.sqrt(scan[i].x**2 + scan[i].y**2)
             end_cell = Position(int(global_scan[i].x/self._cell_size), int(global_scan[i].y/self._cell_size))
+            if (dist > 20):
+                scale = 20.0/dist
+                end_cell = Position(
+                    int(start_cell.x + scale*(end_cell.x - start_cell.x)),
+                    int(start_cell.y + scale*(end_cell.y - start_cell.y))
+                )
+                end_is_occ = False
 
             points_to_update = HybridMap.get_affected_points(
                 start_cell.x, start_cell.y, 
@@ -99,16 +119,16 @@ class HybridMap:
                 pos = Position(indices[0]*self._cell_size, indices[1]*self._cell_size)
                 m = self.get_map_with_pos(pos.x, pos.y)
                 if (m == None):
-                    centre_x = ceil((pos.x - self._map_len_m/2.0)/self._map_len_m)*self._map_len_m
-                    centre_y = ceil((pos.y - self._map_len_m/2.0)/self._map_len_m)*self._map_len_m
+                    centre_x = ceil((pos.x + 1e-12 - self._map_len_m/2.0)/self._map_len_m)*self._map_len_m
+                    centre_y = ceil((pos.y + 1e-12  - self._map_len_m/2.0)/self._map_len_m)*self._map_len_m
                     new_map_centre = Position(centre_x, centre_y)
+                    print("Adding gridmap at:", new_map_centre, " to hybrid map for point:", pos, " Total maps: " + str(len(self._maps) + 1))
                     m = HybridMapEntry(self._matlab, new_map_centre, self._map_len_m, self._cell_size)
                     self._maps.append(m)
-                    continue
                 m = cast(HybridMapEntry, m)
 
                 rel_pos = Position(pos.x - m.centre().x, pos.y - m.centre().y)
-                if indices[0] == end_cell.x and indices[1] == end_cell.y:
+                if end_is_occ and indices[0] == end_cell.x and indices[1] == end_cell.y:
                     m.map().set_occupied_pos(rel_pos.x, rel_pos.y)
                     # TODO: Update nearby point
                     pass
@@ -116,53 +136,102 @@ class HybridMap:
                     m.map().set_empty_pos(rel_pos.x, rel_pos.y)
         return self
 
-    def get_scan_match(self, prev_scan: Scan, rel_scan: Scan, guess: Pose, pose_range: np.ndarray) -> Tuple[List[float], List[List[float]], float]:
-        scan = rel_scan.from_global_reference(guess)
+    def get_scan_match(self, rel_scan: Scan, prev_scan: Scan, guess: Pose, pose_range: np.ndarray) -> Tuple[List[float], List[List[float]], float]:
+        glob_scan = rel_scan.from_global_reference(guess)
 
-        curr_points = []
-        ref_points = []
-
-        min_x, min_y, max_x, max_y = 0.0, 0.0, 0.0, 0.0
-        for i in range(0, len(scan)):
+        points_maps: List[HybridMapEntry] = []
+        curr_points: List[Tuple[float, float]] = []
+        ref_points:  List[Tuple[float, float]] = []
+        
+        # Get the limits of points to check.
+        # min_x, min_y, max_x, max_y = 0.0, 0.0, 0.0, 0.0
+        for i in range(0, len(glob_scan)):
             dist = np.sqrt((rel_scan.x()[i])**2 + (rel_scan.y()[i])**2)
             if (dist < VALID_DIST_THRESHOLD and dist > 1e-3):
-                x, y = scan.x()[i], scan.y()[i]
-                if (x < min_x):
-                    min_x = x
-                if (y < min_y):
-                    min_y = y
-                if (x > max_x):
-                    max_x = x
-                if (y > max_y):
-                    max_y = y
-                curr_points.append([scan.x()[i], scan.y()[i]])
-        min_x, min_y, max_x, max_y = min_x - 0.5, min_y -0.5, max_x + 0.5, max_y + 0.5
+                x, y = glob_scan.x()[i], glob_scan.y()[i]
+                # if (x < min_x):
+                #     min_x = x
+                # if (y < min_y):
+                #     min_y = y
+                # if (x > max_x):
+                #     max_x = x
+                # if (y > max_y):
+                #     max_y = y
+                for m in self._maps:
+                    if (m.is_in_map(Position(x, y))):
+                        cell = m.map().get_cell(x - m.centre().x, y - m.centre().y)
+                        if (cell == None):
+                            continue
+                        cell = cast(Position, cell)
+                        px = m.map().index_to_distance(cell.x) + m.centre().x
+                        py = m.map().index_to_distance(cell.y) + m.centre().y
+                        points_maps.append(m)
+                        curr_points.append((px, py))
+        # min_x, min_y, max_x, max_y = min_x - 0.5, min_y -0.5, max_x + 0.5, max_y + 0.5
 
-        included_maps: List[HybridMapEntry] = []
-        for x in range(floor(min_x), ceil(max_x), self._map_len_m):
-            for y in range(floor(min_y), ceil(max_y), self._map_len_m):
-                map_to_add = self.get_map_with_pos(Position(x, y), None)
-                if (map_to_add != None):
-                    map_to_add = cast(HybridMapEntry, map_to_add)
-                    if(len([m for m in included_maps if m.centre().x == map_to_add.centre().x and m.centre().y == map_to_add.centre().y]) == 0):
-                        included_maps += [map_to_add]
-        map_to_add = self.get_map_with_pos(Position(max_x, max_y), None)
-        if (map_to_add != None):
-            map_to_add = cast(HybridMapEntry, map_to_add)
-            if(len([m for m in included_maps if m.centre().x == map_to_add.centre().x and m.centre().y == map_to_add.centre().y]) == 0):
-                included_maps += [map_to_add]
-    
-        for m in included_maps:
-            # TODO: This additional function in Gridmap.
-            min_cnr = Position(min_x - m.centre().x, min_y - m.centre().y)
-            max_cnr = Position(max_x - m.centre().x, max_y - m.centre().y)
-            dist_points_to_add = m.map().get_occ_points_between(min_cnr, max_cnr)
-            ref_points.extend([(p[0] + m.centre().x, p[1] + m.centre().y) for p in dist_points_to_add])
+        # included_maps: List[HybridMapEntry] = self._maps
+        # # Get a small list of maps to check.
+        # for x in range(floor(min_x), ceil(max_x), self._map_len_m):
+        #     for y in range(floor(min_y), ceil(max_y), self._map_len_m):
+        #         map_to_add = self.get_map_with_pos(Position(x, y), None)
+        #         if (map_to_add != None):
+        #             map_to_add = cast(HybridMapEntry, map_to_add)
+        #             if(len([m for m in included_maps if m.centre().x == map_to_add.centre().x and m.centre().y == map_to_add.centre().y]) == 0):
+        #                 included_maps += [map_to_add]
+        # map_to_add = self.get_map_with_pos(Position(max_x, max_y), None)
+        # if (map_to_add != None):
+        #     map_to_add = cast(HybridMapEntry, map_to_add)
+        #     if(len([m for m in included_maps if m.centre().x == map_to_add.centre().x and m.centre().y == map_to_add.centre().y]) == 0):
+        #         included_maps += [map_to_add]
+        # cache_map: Union[HybridMapEntry, None] = None
 
+        for i in range(len(points_maps)):
+            centre_p = curr_points[i]
+            mp = points_maps[i]
+            cell = mp.map().get_cell(centre_p[0] - mp.centre().x, centre_p[1] - mp.centre().y)
+            nearby_points: np.ndarray = []
+            if cell != None:
+                nearby_points = mp.map().get_nearby_occ_points(cast(Position,cell))
+            else:
+                print("FKKKKKKK")
+                continue
+            ref_points.extend([(p[0] + mp.centre().x, p[1] + mp.centre().y) for p in nearby_points])
+    # for x in np.arange(-0.75, 0.76, 0.05):
+            #     x = centre_p[0] + x
+            #     for y in np.arange(-0.75, 0.76, 0.05):
+            #         y = centre_p[1] + y
+            #         # if (cache_map == None or (not cast(HybridMapEntry, cache_map).is_in_map(Position(x, y)))):
+            #         #     for m in included_maps:
+            #         #         if (m.is_in_map(Position(x, y))):
+            #         #             cache_map = m
+            #         #             break
+            #         #     if (cache_map == None or (not cast(HybridMapEntry, cache_map).is_in_map(Position(x, y)))):
+            #         #         cache_map = None
+            #         # if (cache_map == None):
+            #         #     continue
+            #         cache_map = None
+            #         for m in included_maps:
+            #             if (m.is_in_map(Position(x, y))):
+            #                 cache_map = m
+            #                 break
+            #         if cache_map == None:
+            #             continue
+            #         cache_map = cast(HybridMapEntry, cache_map)
+            #         if (cache_map.map().is_occ_at(x - cache_map.centre().x, y - cache_map.centre().y)):
+            #             # TODO: Figure out why some points aren't being added.
+            #             cell = cache_map.map().get_cell(x - cache_map.centre().x, y - cache_map.centre().y)
+            #             if (cell != None):
+            #                 cell = cast(Position, cell)
+            #                 add_x = cache_map.map().index_to_distance(cell.x) + cache_map.centre().x
+            #                 add_y = cache_map.map().index_to_distance(cell.y) + cache_map.centre().y
+            #                 ref_points.append([add_x, add_y])
+
+        print("original ref_points len: ", len(ref_points))
         curr_adjusted_points = [[p[0] - guess.x(), p[1] - guess.y()] for p in curr_points]
         unique_ref_points = [[p[0] - guess.x(), p[1] - guess.y()] for p in np.unique(ref_points, axis=0)]
 
-        valid_ref_points = [[p[0], p[1]] for p in unique_ref_points if np.sqrt(p[0]**2 + p[1]**2) < VALID_DIST_THRESHOLD]
+        print("unique ref_points len: ", len(unique_ref_points))
+        valid_ref_points = [[p[0], p[1]] for p in unique_ref_points if np.sqrt(p[0]**2 + p[1]**2) < VALID_DIST_THRESHOLD + 0.5]
         valid_curr_points = [[p[0], p[1]] for p in curr_adjusted_points if np.sqrt(p[0]**2 + p[1]**2) < VALID_DIST_THRESHOLD]
         print("curr_points", len(valid_curr_points), " : ", valid_curr_points)
         print("ref_points", len(valid_ref_points), " : ", valid_ref_points)
@@ -237,8 +306,8 @@ class HybridMap:
             for i in range(0, len(m)):
                 for j in range(0, len(m)):
                     if m[i][j] > OCCUPIED_POINT_THRESHOLD:
-                        x.append((i - len(m)/2)*self._cell_size + map.centre().x)
-                        y.append((j - len(m)/2)*self._cell_size + map.centre().y) 
+                        x.append(((i - len(m)/2)*self._cell_size + map.centre().x)/self._cell_size)
+                        y.append(((j - len(m)/2)*self._cell_size + map.centre().y)/self._cell_size)
         return x, y
 
     def copy(self):

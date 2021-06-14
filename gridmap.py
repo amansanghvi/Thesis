@@ -1,3 +1,4 @@
+from Map import Map
 from typing import Any, List, Optional, Tuple, Union, cast
 
 import matlab
@@ -15,7 +16,7 @@ CELL_SIZE = MAP_LENGTH / CELLS_PER_ROW
 RELEVANT_POINT_DIST = 10.0
 OCCUPIED_POINT_THRESHOLD = 1.0
 
-class GridMap:
+class GridMap(Map):
     _map = np.array([])
     _size = 0 # in metres
     _matlab: Any = None
@@ -24,15 +25,15 @@ class GridMap:
     max_odds_occ = 3.0  # Can only be at most ~95% confident on occupancy.
     log_odds_emp = -0.30  # Probability of 0.2.
     min_odds_emp = -3.0  # Can only be at most ~90% sure a cell is empty.
-    def __init__(self, matlab, map_len=MAP_LENGTH, cell_size=CELL_SIZE):
-        if (matlab == None and map_len == None and cell_size == None):
+    def __init__(self, matlab, map_len_m=MAP_LENGTH, cell_size=CELL_SIZE):
+        if (matlab == None and map_len_m == None and cell_size == None):
             return
-        if map_len < 1:
+        if map_len_m < 1:
             raise Exception("Cannot have map length less than 1m")
-        dim = round(map_len/cell_size)
+        dim = round(map_len_m/cell_size)
         self._map = np.zeros((dim, dim))
         self._cell_size = cell_size
-        self._size = map_len
+        self._size = map_len_m
         self._matlab = matlab
     
     def __getitem__(self, idx: int) -> list: # Hacky way to allow double indexing
@@ -114,13 +115,11 @@ class GridMap:
 
     # Input is GLOBAL x and y in metres
     def get_cell(self, x: float, y: float) -> Optional[Position]:
-        if y <= -self._size/2 or y >= self._size/2:
+        if y < -self._size/2 or y >= self._size/2:
             return None
-        elif x <= -self._size/2 or x >= self._size/2:
+        elif x < -self._size/2 or x >= self._size/2:
             return None
         return Position( 
-            # Use int() to truncate because we assume cells are either completely full
-            # We round the number closer to zero.
             int(x/self._size * len(self._map) + len(self._map)/2), 
             int(y/self._size * len(self._map) + len(self._map)/2)
         )
@@ -206,6 +205,13 @@ class GridMap:
             print("@@@@@@@ ERRRRRRR @@@@@@@")
             print("@@@@@@@@@@@@@@@@@@@@@@@@")
             raise
+    
+    def is_occ_at(self, x, y) -> bool:
+        cell = self.get_cell(x, y)
+        if (cell == None):
+            return False
+        cell = cast(Position, cell)
+        return self._map[cell.x][cell.y] > OCCUPIED_POINT_THRESHOLD
 
     def get_occ_points_between(self, min_cnr: Position, max_cnr: Position) -> List[Tuple[float, float]]:
         min_cnr_x = self.get_cell(min_cnr.x, 0.0)
