@@ -25,7 +25,7 @@ from robot import Robot
 MAX_UPDATE_COUNT = 2
 ROT_THRESHOLD = pi/9
 DIST_THRESHOLD = 0.25
-NUM_PARTICLES = 5
+NUM_PARTICLES = 4
 
 def resample(particles: List[Robot]) -> List[Robot]:
     weights = np.array([p.weight()[-1] for p in particles])
@@ -119,12 +119,12 @@ if __name__ == "__main__":
             print("Frame: ", plotFrameNumber, " IMU: ", imu_idx)
             curr_pose = particles[0].get_latest_pose()
             dist = sqrt((last_updated_pose.x() - curr_pose.x())**2 + (last_updated_pose.y() - curr_pose.y())**2)
-            dth = abs(last_updated_pose.theta() - curr_pose.theta())
-            if (update_count < MAX_UPDATE_COUNT or (dist >= DIST_THRESHOLD or dth >= ROT_THRESHOLD)):
+            rot = abs(last_updated_pose.theta() - curr_pose.theta())
+            if (update_count < MAX_UPDATE_COUNT or (dist >= DIST_THRESHOLD or rot >= ROT_THRESHOLD)):
                 weights = [p.map_update(lidar_reading, last_scan) for p in particles]
                 particles = resample(particles)
                 # robot._map.update(robot.get_latest_pose(), lidar_reading)
-                if (dist >= DIST_THRESHOLD or dth >= ROT_THRESHOLD):
+                if (dist >= DIST_THRESHOLD or rot >= ROT_THRESHOLD):
                     update_count = 0
                     last_updated_pose = curr_pose
                 elif (update_count < MAX_UPDATE_COUNT):

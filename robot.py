@@ -64,8 +64,8 @@ class Robot:
         # We only search within a restricted range 3.0 standard deviations of the mean.
         pose_range = np.sqrt(np.diag(self._cov))*3.0
         pose_range[2] = max(min(4*pose_range[2], pi/3), 1e-8)
-        pose_range[1] = max(min(4*pose_range[1], 5.0), 1e-8)
-        pose_range[0] = max(min(4*pose_range[0], 5.0), 1e-8)
+        pose_range[1] = max(min(4*pose_range[1], 0.5), 1e-8)
+        pose_range[0] = max(min(4*pose_range[0], 0.5), 1e-8)
         scan_pose, scan_cov, score = self._map.get_scan_match(scan, last_scan, latest_pose, pose_range)
         print("poses: ", scan_pose, " vs ", latest_pose)
         print("SCORE: " , score)

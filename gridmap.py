@@ -112,6 +112,11 @@ class GridMap(Map):
             self._map[x][y] + self.log_odds_nearby, 
             self.max_odds_occ
         )
+    
+    def set_nearby_pos(self, x: float, y: float):
+        x_idx = int(x/self._cell_size + len(self._map)/2.0)
+        y_idx = int(y/self._cell_size + len(self._map)/2.0)
+        self.set_nearby(x_idx, y_idx)
 
     # Input is GLOBAL x and y in metres
     def get_cell(self, x: float, y: float) -> Optional[Position]:
@@ -120,8 +125,20 @@ class GridMap(Map):
         elif x < -self._size/2 or x >= self._size/2:
             return None
         return Position( 
-            int(x/self._size * len(self._map) + len(self._map)/2), 
+            int(x/self._size * len(self._map) + len(self._map)/2),
             int(y/self._size * len(self._map) + len(self._map)/2)
+        )
+    
+    def _get_rel_cell(self, x: float, y: float) -> Position:
+        dec_y = 0
+        dec_x = 0
+        if y < -self._size/2:
+            dec_y = 1
+        elif x < -self._size/2:
+            dec_x = 1
+        return Position( 
+            int(x/self._size * len(self._map) + len(self._map)/2) - dec_x,
+            int(y/self._size * len(self._map) + len(self._map)/2) - dec_y
         )
 
     def get_nearby_occ_points(self, curr_cell: Position) -> np.ndarray:
