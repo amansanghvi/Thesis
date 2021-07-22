@@ -20,15 +20,7 @@ OCCUPIED_POINT_THRESHOLD = 1.0
 VALID_DIST_THRESHOLD = 11.0
 
 class HybridMapEntry:
-    _min_x = 0.0
-    _min_y = 0.0
-    _max_x = 0.0
-    _max_y = 0.0
-    _map: GridMap
-    _centre: Position
     _matlab: Any = None
-    _map_len_m = 0
-    _cell_size = 0.0
     def __init__(self, matlab, centre: Position, map_len_m: int, cell_size: float) -> None:
         self._map_len_m = map_len_m
         self._cell_size = cell_size
@@ -42,6 +34,12 @@ class HybridMapEntry:
             self._min_y = centre.y - map_radius
             self._max_x = centre.x + map_radius
             self._max_y = centre.y + map_radius
+        else:
+            self._min_x = 0.0
+            self._min_y = 0.0
+            self._max_x = 0.0
+            self._max_y = 0.0
+            self._map = cast(GridMap, None)
 
     def is_in_map(self, pos: Position) -> bool:
         return pos.x >= self._min_x and pos.x < self._max_x and pos.y >= self._min_y and pos.y < self._max_y
@@ -63,13 +61,13 @@ class HybridMapEntry:
         return new_entry
 
 class HybridMap(Map):
-    _cell_size = 0.05
-    _map_len_m = 40
     _maps: List[HybridMapEntry] = []
+    _matlab: Any = None
     def __init__(self, matlab):
+        self._cell_size = 0.05
+        self._map_len_m = 40
         self._matlab = matlab
         self._maps += [HybridMapEntry(matlab, Position(0, 0), self._map_len_m, self._cell_size)]
-
     def __str__(self) -> str:
         return "Hybrid Map: " + str(len(self._maps)) + " maps"
     

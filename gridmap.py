@@ -17,14 +17,12 @@ RELEVANT_POINT_DIST = 12.0
 OCCUPIED_POINT_THRESHOLD = 1.0
 
 class GridMap(Map):
-    _map = np.array([])
-    _size = 0 # in metres
-    _matlab: Any = None
     log_odds_occ = 0.80
     log_odds_nearby = 0.20
     max_odds_occ = 3.0  # Can only be at most ~95% confident on occupancy.
     log_odds_emp = -0.30  # Probability of 0.2.
     min_odds_emp = -3.0  # Can only be at most ~90% sure a cell is empty.
+    _matlab: Any = None
     def __init__(self, matlab, map_len_m=MAP_LENGTH, cell_size=CELL_SIZE):
         if (matlab == None and map_len_m == None and cell_size == None):
             return

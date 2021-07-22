@@ -1,5 +1,6 @@
 from math import pi, sqrt, floor
 from typing import List, cast
+import shelve
 import matlab.engine
 import matplotlib.pyplot as plt
 import numpy as np
@@ -105,14 +106,36 @@ if __name__ == "__main__":
     line = ax.plot([0], [0], 'r-')[0]
     plt.xlim(-500, 500)
     plt.ylim(-500, 500)
-    plotFrameNumber = 0
+    plotFrameNumber = 1550
     last_updated_pose = particles[0].get_latest_pose()
     last_scan = lidar_data[0].from_global_reference(last_updated_pose)
     update_count = 0
 
     times = np.unique(np.concatenate((imu_data._times, lidar_data._times)))
+    t_idx = 3422
 
-    for t in times:
+    with shelve.open('pickle/' + str(plotFrameNumber) + '.state', 'r') as shelf:
+        prev_timestamp = shelf["prev_timestamp"]
+        imu_idx = shelf["imu_idx"]
+        lidar_idx = shelf["lidar_idx"]
+        last_updated_pose = shelf["last_updated_pose"]
+        last_scan = shelf["last_scan"]
+        update_count = shelf["update_count"]
+        robot = shelf["robot"]
+        robot._map._matlab = eng
+        for m in robot._map._maps:
+            m._matlab = eng
+            m._map._matlab = eng
+        particles = [robot]
+        # t_idx = times.tolist().index(shelf["t"])
+        print("timestamp", prev_timestamp)
+        print("imu_idx", imu_idx)
+        print("lidar_idx", lidar_idx)
+        print("last_updated_pose", last_updated_pose)
+        print("last_scan", last_scan)
+        print("update_count", update_count)
+
+    for t in times[t_idx:]:
         imu_reading = imu_data[imu_idx]
         if imu_reading.timestamp() == t:
             imu_idx = min(imu_idx + 1, len(imu_data)-1)
@@ -157,9 +180,38 @@ if __name__ == "__main__":
             plotFrameNumber += 1
             fig.canvas.draw_idle()
             plt.pause(0.001)
-            if (plotFrameNumber == 915):
+            if (plotFrameNumber % 50 == 0):
+                print("timestamp", prev_timestamp)
+                print("imu_idx", imu_idx)
+                print("lidar_idx", lidar_idx)
+                print("last_updated_pose", last_updated_pose)
+                print("last_scan", last_scan)
+                print("update_count", update_count)
+                print("t", t, times.tolist().index(t))
+                shelf = shelve.open("pickle/" + str(plotFrameNumber) + ".state")
+                shelf["prev_timestamp"] = prev_timestamp
+                shelf["imu_idx"] = imu_idx
+                shelf["lidar_idx"] = lidar_idx
+                shelf["last_updated_pose"] = last_updated_pose
+                shelf["last_scan"] = last_scan
+                shelf["update_count"] = update_count
+                shelf["plotFrameNumber"] = plotFrameNumber
+                shelf["t"] = t
+                robot = particles[0]
+                robot._map._matlab = None
+                for m in robot._map._maps:
+                    m._matlab = None
+                    m._map._matlab = None
+                shelf["robot"] = particles[0]
+                shelf.close()
+                robot._map._matlab = eng
+                for m in robot._map._maps:
+                    m._matlab = eng
+                    m._map._matlab = eng
+
                 particles[0]._map.show()
                 fig.canvas.draw_idle()
+                
 
     particles[0]._map.show()
     ax.set_title("COMPLETED")

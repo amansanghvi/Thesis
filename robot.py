@@ -17,17 +17,15 @@ CELL_SIZE = MAP_LENGTH / CELLS_IN_ROW
 NUM_SAMPLE_POINTS = 30
 
 class Robot:
-    _x = [0.0]
-    _y = [0.0]
-    _theta = [0.0]
-    _map: HybridMap
-    _weight = [1.0]
-    _cov = np.zeros((3, 3), dtype=np.longdouble)
     def __init__(self, matlab):
         if (matlab != None):
             # self._map = GridMap(matlab, 50, 0.05)
             self._map = HybridMap(matlab)
             self._weight = [1.0]
+            self._cov = np.zeros((3, 3), dtype=np.longdouble)
+            self._x = [0.0]
+            self._y = [0.0]
+            self._theta = [0.0]
 
     def x(self) -> np.ndarray:
         return self._x
