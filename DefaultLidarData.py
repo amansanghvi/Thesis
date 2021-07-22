@@ -13,7 +13,7 @@ class DefaultLidarData(LidarData):
             [0.01*(x & 0x1FFF) for x in lidarData['dataL']['Scans'][0][0]]
         ).transpose()
         times = np.array([
-            x for x in lidarData['dataL']['times'][0][0][0]]
+            x*1e4 for x in lidarData['dataL']['times'][0][0][0]]
         )
         angles = np.array([-pi/2 + i*pi/360 for i in range(POINTS_PER_SCAN)]) # [-pi/2, pi/2]
         return times, scans, angles

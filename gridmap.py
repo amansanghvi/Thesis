@@ -13,7 +13,7 @@ from models import Pose, Position
 MAP_LENGTH = 10 # metres
 CELLS_PER_ROW = 100
 CELL_SIZE = MAP_LENGTH / CELLS_PER_ROW
-RELEVANT_POINT_DIST = 10.0
+RELEVANT_POINT_DIST = 12.0
 OCCUPIED_POINT_THRESHOLD = 1.0
 
 class GridMap(Map):
@@ -142,7 +142,7 @@ class GridMap(Map):
         )
 
     def get_nearby_occ_points(self, curr_cell: Position) -> np.ndarray:
-        pos_range = int(1.5/self._cell_size)
+        pos_range = int(1.8/self._cell_size)
         result = []
         
         start_x = max(0, curr_cell.x-pos_range)
@@ -155,7 +155,39 @@ class GridMap(Map):
                 if self._map[x][y] > OCCUPIED_POINT_THRESHOLD:
                     result.append([self.index_to_distance(x), self.index_to_distance(y)])
         return result
-    
+    def get_scan_adj(self, rel_scan: Scan, prev_scan: Scan, guess: Pose, pose_range: np.ndarray) -> Tuple[List[float], List[List[float]], float]:
+        scan = rel_scan.from_global_reference(guess)
+        curr_points = []
+        ref_points = []
+
+        for i in range(0, len(scan)):
+            curr_points.append([scan.x()[i], scan.y()[i]])
+        for i in range(0, len(prev_scan)):
+            ref_points.append([prev_scan.x()[i], prev_scan.y()[i]])
+        curr_adjusted_points = [[p[0] - guess.x(), p[1] - guess.y()] for p in curr_points]
+        unique_ref_points = [[p[0] - guess.x(), p[1] - guess.y()] for p in ref_points]
+        valid_ref_points = [[p[0], p[1]] for p in unique_ref_points if np.sqrt(p[0]**2 + p[1]**2) < 11.0]
+        valid_curr_points = [[p[0], p[1]] for p in curr_adjusted_points if np.sqrt(p[0]**2 + p[1]**2) < 11.0]
+        try:
+            p, cov, score = self._matlab.matchScanCustom(
+                matlab.double(valid_curr_points),
+                matlab.double(valid_ref_points if len(valid_ref_points) > 0 else [[]]),
+                matlab.double([0.0, 0.0, 0.0]),
+                int(1.0/self._cell_size), # Passing value as double
+                matlab.double([pose_range[0], pose_range[1], np.pi/6]),
+                nargout=3
+            )
+            print("Original returned pose: ", p[0])
+            p[0][0] += guess.x()
+            p[0][1] += guess.y()
+            p[0][2] += guess.theta()
+            return p[0], cov, score
+        except:
+            print("@@@@@@@@@@@@@@@@@@@@@@@@")
+            print("@@@@@@@ ERRRRRRR @@@@@@@")
+            print("@@@@@@@@@@@@@@@@@@@@@@@@")
+            raise
+
     def get_scan_match(self, rel_scan: Scan, prev_scan: Scan, guess: Pose, pose_range: np.ndarray) -> Tuple[List[float], List[List[float]], float]:
         default_return = ([guess.x(), guess.y(), guess.theta()], np.zeros((3, 3), dtype=np.float), 0.0)
         scan = rel_scan.from_global_reference(guess)
@@ -167,7 +199,6 @@ class GridMap(Map):
 
         if ((left_x == None and guess.x() > 0) or (right_x == None and guess.x() < 0)
             or (up_y == None and guess.y() < 0) or (down_y == None and guess.y() > 0)):
-                print("Guess is too far out at: ", guess, file=sys.stderr)
                 return default_return
 
         curr_points = []
@@ -198,11 +229,11 @@ class GridMap(Map):
         # unique_ref_points = [[p[0] - guess.x(), p[1] - guess.y()] for p in ref_points]
         valid_ref_points = [[p[0], p[1]] for p in unique_ref_points if np.sqrt(p[0]**2 + p[1]**2) < 11.0]
         valid_curr_points = [[p[0], p[1]] for p in curr_adjusted_points if np.sqrt(p[0]**2 + p[1]**2) < 11.0]
-        print("curr_points", len(valid_curr_points), " : ", valid_curr_points)
-        print("ref_points", len(valid_ref_points), " : ", valid_ref_points)
-        print("guess", guess.theta())
-        print("resolution", int(1.0/self._cell_size))
-        print("range", pose_range)
+        # print("curr_points", len(valid_curr_points), " : ", valid_curr_points)
+        # print("ref_points", len(valid_ref_points), " : ", valid_ref_points)
+        # print("guess", guess.theta())
+        # print("resolution", int(1.0/self._cell_size))
+        # print("range", pose_range)
         try:
             p, cov, score = self._matlab.matchScanCustom(
                 matlab.double(valid_curr_points),
@@ -212,7 +243,7 @@ class GridMap(Map):
                 matlab.double([pose_range[0], pose_range[1], np.pi/6]),
                 nargout=3
             )
-            print("Original returned pose: ", p[0])
+            # print("Original returned pose: ", p[0])
             p[0][0] += guess.x()
             p[0][1] += guess.y()
             p[0][2] += guess.theta()
@@ -253,8 +284,6 @@ class GridMap(Map):
                     result.append((self.index_to_distance(x), self.index_to_distance(y)))
         return result
 
-
-
     @staticmethod
     def get_affected_points(x0: int, y0: int, x1: int, y1: int) -> List[Tuple[int, int]]:
         dx = abs(x1 - x0)
@@ -283,7 +312,13 @@ class GridMap(Map):
                 D -= 2*dx
             D += 2*dy
         return result
-        
+
+    def get_odds_at(self, pos: Position) -> Optional[float]:
+        cell = self.get_cell(pos.x, pos.y)
+        if cell == None:
+            return None
+        return self._map[cast(Position, cell).x][cast(Position, cell).y]
+
     # Does not gives accurate position. 
     # Uses an arbitrary unit of distance.
     def get_occupied_points(self):
@@ -313,5 +348,3 @@ class GridMap(Map):
         plt.figure()
         plt.scatter(x, y, s=2)
         plt.show(block=False)
-
-

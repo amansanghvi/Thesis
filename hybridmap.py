@@ -83,9 +83,19 @@ class HybridMap(Map):
                 odds = np.exp(map._map[cast(Position, cell).x][cast(Position, cell).y])
                 return odds/(1 + odds)
         return None
+
+    def get_odds_at(self, pos: Position) -> Optional[float]:
+        for map in self._maps:
+            if (map.is_in_map(pos)):
+                rel_pos = Position(pos.x - map.centre().x, pos.y - map.centre().y)
+                cell = map.map().get_cell(rel_pos.x, rel_pos.y)
+                if cell == None:
+                    return None
+                return map._map[cast(Position, cell).x][cast(Position, cell).y]
+        return None
     
     def update(self, robot_pose: Pose, scan: Scan) -> Any:
-        print("Updating hybrid map")
+        # print("Updating hybrid map")
         global_scan = scan.from_global_reference(robot_pose)
         m = self.get_map_with_pos(robot_pose.pos(), None)
         if (m == None):
@@ -96,8 +106,8 @@ class HybridMap(Map):
             end_is_occ = True
             dist = np.sqrt(scan[i].x**2 + scan[i].y**2)
             end_cell = Position(int(global_scan[i].x/self._cell_size), int(global_scan[i].y/self._cell_size))
-            if (dist > 40):
-                scale = 40.0/dist
+            if (dist > 15):
+                scale = 15.0/dist
                 end_cell = Position(
                     int(start_cell.x + scale*(end_cell.x - start_cell.x)),
                     int(start_cell.y + scale*(end_cell.y - start_cell.y))
@@ -135,6 +145,52 @@ class HybridMap(Map):
                 else:
                     m.map().set_empty_pos(rel_pos.x, rel_pos.y)
         return self
+    
+    def get_scan_adj(self, rel_scan: Scan, prev_scan: Scan, guess: Pose, pose_range: np.ndarray) -> Tuple[List[float], List[List[float]], float]:
+        scan = rel_scan.from_global_reference(guess)
+        curr_points = []
+        ref_points = []
+        # for i in range(0, len(scan)):
+        #     curr_cell = self.get_cell(scan.x()[i], scan.y()[i])
+        #     if (curr_cell == None):
+        #         continue
+        #     curr_cell = cast(Position, curr_cell)
+        #     curr_points.append([
+        #         self.index_to_distance(curr_cell.x), 
+        #         self.index_to_distance(curr_cell.y)
+        #     ])
+        #     nearby_points = self.get_nearby_occ_points(curr_cell)
+        #     if (len(nearby_points) != 0):
+        #         ref_points.extend(nearby_points)
+        # curr_adjusted_points = [[p[0] - guess.x(), p[1] - guess.y()] for p in curr_points]
+        # unique_ref_points = [[p[0] - guess.x(), p[1] - guess.y()] for p in np.unique(ref_points, axis=0)]
+        for i in range(0, len(scan)):
+            curr_points.append([scan.x()[i], scan.y()[i]])
+        for i in range(0, len(prev_scan)):
+            ref_points.append([prev_scan.x()[i], prev_scan.y()[i]])
+        curr_adjusted_points = [[p[0] - guess.x(), p[1] - guess.y()] for p in curr_points]
+        unique_ref_points = [[p[0] - guess.x(), p[1] - guess.y()] for p in ref_points]
+        valid_ref_points = [[p[0], p[1]] for p in unique_ref_points if np.sqrt(p[0]**2 + p[1]**2) < 11.0]
+        valid_curr_points = [[p[0], p[1]] for p in curr_adjusted_points if np.sqrt(p[0]**2 + p[1]**2) < 11.0]
+        try:
+            p, cov, score = self._matlab.matchScanCustom(
+                matlab.double(valid_curr_points),
+                matlab.double(valid_ref_points if len(valid_ref_points) > 0 else [[]]),
+                matlab.double([0.0, 0.0, 0.0]),
+                int(1.0/self._cell_size), # Passing value as double
+                matlab.double([pose_range[0], pose_range[1], np.pi/6]),
+                nargout=3
+            )
+            print("Original returned pose: ", p[0])
+            p[0][0] += guess.x()
+            p[0][1] += guess.y()
+            p[0][2] += guess.theta()
+            return p[0], cov, score
+        except:
+            print("@@@@@@@@@@@@@@@@@@@@@@@@")
+            print("@@@@@@@ ERRRRRRR @@@@@@@")
+            print("@@@@@@@@@@@@@@@@@@@@@@@@")
+            raise
 
     def _get_map_centre(self, x: float, y: float) -> Position:
         approx_x = int(round(x/self._map_len_m))
@@ -179,18 +235,13 @@ class HybridMap(Map):
                 nearby_points = mp.map().get_nearby_occ_points(cell)
                 ref_points.extend([(p[0] + mp.centre().x, p[1] + mp.centre().y) for p in nearby_points])
 
-        print("original ref_points len: ", len(ref_points))
         curr_adjusted_points = [[p[0] - guess.x(), p[1] - guess.y()] for p in curr_points]
         unique_ref_points = [[p[0] - guess.x(), p[1] - guess.y()] for p in np.unique(ref_points, axis=0)]
 
-        print("unique ref_points len: ", len(unique_ref_points))
         valid_ref_points = [[p[0], p[1]] for p in unique_ref_points if np.sqrt(p[0]**2 + p[1]**2) < VALID_DIST_THRESHOLD + 0.5]
         valid_curr_points = [[p[0], p[1]] for p in curr_adjusted_points if np.sqrt(p[0]**2 + p[1]**2) < VALID_DIST_THRESHOLD]
-        print("curr_points", len(valid_curr_points), " : ", valid_curr_points)
-        print("ref_points", len(valid_ref_points), " : ", valid_ref_points)
-        print("guess", guess.theta())
-        print("resolution", int(1.0/self._cell_size))
-        print("range", pose_range)
+        # print("curr_points", len(valid_curr_points), " : ", valid_curr_points)
+        # print("ref_points", len(valid_ref_points), " : ", valid_ref_points)
         try:
             p, cov, score = self._matlab.matchScanCustom(
                 matlab.double(valid_curr_points),
@@ -200,7 +251,7 @@ class HybridMap(Map):
                 matlab.double([pose_range[0], pose_range[1], np.pi/6]),
                 nargout=3
             )
-            print("Original returned pose: ", p[0])
+            # print("Original returned pose: ", p[0])
             p[0][0] += guess.x()
             p[0][1] += guess.y()
             p[0][2] += guess.theta()

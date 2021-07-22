@@ -10,11 +10,26 @@ from DefaultLidarData import DefaultLidarData
 from FreidIMUData import FreidIMUData
 from FreidLidarData import FreidLidarData
 
+from FreidCorrectIMUData import FreidCorrectIMUData
+from FreidCorrectLidarData import FreidCorrectLidarData
+
+from Freid101IMUData import Freid101IMUData
+from Freid101LidarData import Freid101LidarData
+
 from IntelIMUData import IntelIMUData
 from IntelLidarData import IntelLidarData
 
 from IntelRawIMUData import IntelRawIMUData
 from IntelRawLidarData import IntelRawLidarData
+
+from AcesIMUData import AcesIMUData
+from AcesLidarData import AcesLidarData
+
+from OberoIMUData import OberoIMUData
+from OberoLidarData import OberoLidarData
+
+from BeleIMUData import BeleIMUData
+from BeleLidarData import BeleLidarData
 
 from gridmap import GridMap
 from imu import IMU
@@ -24,25 +39,20 @@ from robot import Robot
 
 MAX_UPDATE_COUNT = 2
 ROT_THRESHOLD = pi/9
-DIST_THRESHOLD = 0.25
-NUM_PARTICLES = 4
+DIST_THRESHOLD = 0.33
+NUM_PARTICLES = 1
 
 def resample(particles: List[Robot]) -> List[Robot]:
     weights = np.array([p.weight()[-1] for p in particles])
-    print("Poses: ", [p.get_latest_pose() for p in particles])
-    print("Weights: ", weights)
-    avg = np.mean(weights)
-    stddev = np.std(weights)
-    print("Std dev", stddev)
+    # print("Weights: ", weights)
     new_particles = particles
-    if(max(weights)/min(weights) > 1e200):
+    if(max(weights) - min(weights) > 200):
         # resample
-        resample_weights = np.log10(weights)
-        print("Log weights: ", resample_weights)
+        resample_weights = weights
         resample_weights[resample_weights == -np.inf] = 0
         if (min(resample_weights) < 0):
             resample_weights[resample_weights != 0] += abs(min(resample_weights))
-        print("Adjusted: ", resample_weights)
+        # print("Adjusted: ", resample_weights)
         slice = sum(resample_weights)/len(resample_weights)
         new_sample_idxs: List[int] = []
         start_weight = np.random.random()*slice
@@ -54,7 +64,6 @@ def resample(particles: List[Robot]) -> List[Robot]:
         
         if (len(resample_weights) != len(new_sample_idxs)):
             raise AssertionError("Incorrect number of resampled weights.")
-        print("Slice:", slice, " Start: ", start_weight, " New idx:", new_sample_idxs)
         new_particles = []
         prev_i = -1
         for i in new_sample_idxs:
@@ -71,13 +80,13 @@ def resample(particles: List[Robot]) -> List[Robot]:
 if __name__ == "__main__":
     eng = matlab.engine.connect_matlab()
 
-    lidar_data = Lidar(FreidLidarData(), eng)
-    imu_data = IMU(FreidIMUData())
+    lidar_data = Lidar(Freid101LidarData(), eng)
+    imu_data = IMU(Freid101IMUData())
     map = GridMap(eng, 40, 0.1)
     particles = [Robot(eng) for _ in range(NUM_PARTICLES)]
     
-    [p._map.update(p.get_latest_pose(), lidar_data[0]) for p in particles]
-    [p._map.update(p.get_latest_pose(), lidar_data[0]) for p in particles]
+    # [p._map.update(p.get_latest_pose(), lidar_data[0]) for p in particles]
+    # [p._map.update(p.get_latest_pose(), lidar_data[0]) for p in particles]
 
     print(particles[0])
     print(lidar_data)
@@ -115,13 +124,16 @@ if __name__ == "__main__":
         if lidar_data.timestamp_for_idx(lidar_idx) == t:
             lidar_reading = lidar_data[lidar_idx]
             lidar_idx = min(lidar_idx + 1, len(lidar_data)-1)
-            print("#################################")
+            # print("#################################")
             print("Frame: ", plotFrameNumber, " IMU: ", imu_idx)
             curr_pose = particles[0].get_latest_pose()
             dist = sqrt((last_updated_pose.x() - curr_pose.x())**2 + (last_updated_pose.y() - curr_pose.y())**2)
             rot = abs(last_updated_pose.theta() - curr_pose.theta())
             if (update_count < MAX_UPDATE_COUNT or (dist >= DIST_THRESHOLD or rot >= ROT_THRESHOLD)):
-                weights = [p.map_update(lidar_reading, last_scan) for p in particles]
+                if (plotFrameNumber % 5 < 2):
+                    weights = [p.map_update(lidar_reading, last_scan, False) for p in particles]
+                else:
+                    weights = [p.map_update(lidar_reading, last_scan, True) for p in particles]
                 particles = resample(particles)
                 # robot._map.update(robot.get_latest_pose(), lidar_reading)
                 if (dist >= DIST_THRESHOLD or rot >= ROT_THRESHOLD):
@@ -129,18 +141,25 @@ if __name__ == "__main__":
                     last_updated_pose = curr_pose
                 elif (update_count < MAX_UPDATE_COUNT):
                     update_count += 1
-                last_scan = lidar_reading.from_global_reference(particles[0].get_latest_pose())
-                plot_scan = last_scan
-                sc_scan.set_offsets(np.c_[plot_scan.x()/particles[0]._map._cell_size, plot_scan.y()/particles[0]._map._cell_size])
-                plot_x, plot_y = particles[0]._map.get_occupied_points()
-                sc.set_offsets(np.c_[plot_x, plot_y])
-
-
-            line.set_data(np.array(particles[0].x())/particles[0]._map._cell_size, np.array(particles[0].y())/particles[0]._map._cell_size)
+                if plotFrameNumber % 5 == 0:
+                    last_scan = lidar_reading.from_global_reference(particles[0].get_latest_pose())
+                    plot_scan = last_scan
+                    sc_scan.set_offsets(np.c_[plot_scan.x()/particles[0]._map._cell_size, plot_scan.y()/particles[0]._map._cell_size])
+                    plot_x, plot_y = particles[0]._map.get_occupied_points()
+                    sc.set_offsets(np.c_[plot_x, plot_y])
+                    line.set_data(np.array(particles[0].x())/particles[0]._map._cell_size, np.array(particles[0].y())/particles[0]._map._cell_size)
+                else:
+                    sc_scan.set_offsets(np.c_[[0], [0]])
+                    plot_x, plot_y = particles[0]._map.get_occupied_points()
+                    sc.set_offsets(np.c_[plot_x, plot_y])
+                    line.set_data([], [])
             ax.set_title("Frame: " + str(plotFrameNumber))
             plotFrameNumber += 1
             fig.canvas.draw_idle()
             plt.pause(0.001)
+            if (plotFrameNumber == 915):
+                particles[0]._map.show()
+                fig.canvas.draw_idle()
 
     particles[0]._map.show()
     ax.set_title("COMPLETED")

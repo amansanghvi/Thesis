@@ -58,26 +58,25 @@ class Robot:
 
         return next_pose
 
-    def map_update(self, scan: Scan, last_scan: Scan):
+    def map_update(self, scan: Scan, last_scan: Scan, adj: bool):
         latest_pose = self.get_latest_pose()
-        print("Pose here: ", latest_pose)
         # We only search within a restricted range 3.0 standard deviations of the mean.
-        pose_range = np.sqrt(np.diag(self._cov))*3.0
-        pose_range[2] = max(min(4*pose_range[2], pi/3), 1e-8)
-        pose_range[1] = max(min(4*pose_range[1], 0.5), 1e-8)
-        pose_range[0] = max(min(4*pose_range[0], 0.5), 1e-8)
-        scan_pose, scan_cov, score = self._map.get_scan_match(scan, last_scan, latest_pose, pose_range)
-        print("poses: ", scan_pose, " vs ", latest_pose)
-        print("SCORE: " , score)
-        print("Scan cov: ")
-        print(scan_cov)
-        print("robot cov: ", self._cov)
+        pose_range = np.sqrt(np.diag(self._cov))*30.0
+        pose_range[2] = max(min(4*pose_range[2], pi/3), pi/8)
+        pose_range[1] = max(min(4*pose_range[1], 0.7), 0.1)
+        pose_range[0] = max(min(4*pose_range[0], 0.7), 0.1)
+        if adj:
+            scan_pose, scan_cov, score = self._map.get_scan_adj(scan, last_scan, latest_pose, pose_range)
+        else:
+            scan_pose, scan_cov, score = self._map.get_scan_match(scan, last_scan, latest_pose, pose_range)
+        # print("poses: ", scan_pose, " vs ", latest_pose)
+        # print("SCORE: ", score)
 
         if (np.isnan(scan_cov).any()):
             print("BAD SCORE")
             self._map.update(latest_pose, scan)
-            weight_update = self._generate_sample_weight([[latest_pose.x(), latest_pose.y(), latest_pose.theta()]], scan)
-            self._weight.append(weight_update[0] * self._weight[-1])
+            weight_update = self._generate_sample_weight([[latest_pose.x(), latest_pose.y(), latest_pose.theta()]], scan, [1])
+            self._weight.append(weight_update[0] + self._weight[-1])
             return
 
         K_sample_points = NUM_SAMPLE_POINTS
@@ -87,10 +86,10 @@ class Robot:
         predicted_odd_mean = scan_pose # [latest_pose.x(), latest_pose.y(), latest_pose.theta()]
         predicted_odd_cov = self._cov
 
-        ksample_weights = self._generate_sample_weight(guesses, scan)
-
-        print("Guesses")
-        print(np.column_stack((guesses, ksample_weights)))
+        motion_prs = scipy.multivariate_normal.pdf(guesses, scan_pose, scan_cov)*10
+        ksample_weights = self._generate_sample_weight(guesses, scan, motion_prs)
+        min_w = min(ksample_weights)
+        ksample_weights = [k - min_w + 1e-2 for k in ksample_weights]
 
         mean = np.zeros(3, dtype=np.longdouble)
         sigma = np.zeros((3, 3), dtype=np.longdouble)
@@ -99,7 +98,7 @@ class Robot:
             mean = np.add(mean, guesses[i] * ksample_weights[i])
             norm = norm + ksample_weights[i]
 
-        if (abs(norm) < 1e-8):
+        if (abs(norm) < -1):
             mean = predicted_odd_mean
             sigma = predicted_odd_cov
         else:
@@ -108,40 +107,36 @@ class Robot:
                 delta_pos = np.matrix(np.add(guesses[i], -mean))
                 sigma = sigma + delta_pos.T*delta_pos*ksample_weights[i]
             sigma = np.array(sigma)/norm
-            print("AAAAAAAAAAA")
-
-        print("norm: ",norm)
-        print("Before: ", latest_pose, " after: ", mean)
-        print("sigma: ", sigma)
+            norm = norm + min_w * len(ksample_weights)
         mean_pose = Pose(mean[0], mean[1], mean[2])
         self._cov = sigma
         self._x.append(mean_pose.x())
         self._y.append(mean_pose.y())
         self._theta.append(mean_pose.theta())
-        self._weight.append(norm*self._weight[-1])
+        self._weight.append(norm+self._weight[-1])
         self._map.update(mean_pose, scan)
 
     
-    def _generate_sample_weight(self, guesses: np.ndarray, scan: Scan) -> List[float]:
+    def _generate_sample_weight(self, guesses: np.ndarray, scan: Scan, motion_prs: np.ndarray) -> List[float]:
         ksample_weights = np.zeros(len(guesses), dtype=np.longdouble)
         for i in range(len(guesses)):
             x_k = guesses[i]
-            position_weight = 1.0  # motion_model.pdf(x_k)
+            position_weight = motion_prs[i]  # motion_model.pdf(x_k)
             
             observation_weight = np.longdouble(1.0)
-            multiplier = 1.45
+            multiplier = 1
             adjusted_scan = scan.from_global_reference(Pose(x_k[0], x_k[1], x_k[2]))
             for j in range(len(adjusted_scan)):
                 beam = adjusted_scan[j]
-                dist = np.sqrt((beam.x - x_k[0])**2 + (beam.y - x_k[1])**2)
-                if dist < 15 and dist > 0.01: # If not out of range
-                    pr_occ = self._map.get_pr_at(beam)
+                dist = np.sqrt(scan[j].x**2 + scan[j].y**2)
+                if dist < 25 and dist > 0.01: # If not out of range
+                    pr_occ = self._map.get_odds_at(beam)
                     if (pr_occ == None):
-                        observation_weight *= 0.5*multiplier
+                        observation_weight += 0
                     else:
-                        observation_weight *= cast(float, pr_occ)*multiplier # Arbitrary scaling applied (*10)
+                        observation_weight += cast(float, pr_occ)*multiplier # Arbitrary scaling applied (*10)
                 else:
-                    observation_weight *= 0.5*multiplier
+                    observation_weight += 0
             ksample_weights[i] = observation_weight * position_weight
         return ksample_weights
 

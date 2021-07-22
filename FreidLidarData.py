@@ -10,7 +10,7 @@ POINTS_PER_SCAN = 360
 class FreidLidarData(LidarData):
 
     def load_and_format(self) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
-        with open("./data/fr.log") as readFile:
+        with open("./data/fr.txt") as readFile:
             content = readFile.read().splitlines()
             lines = [line.split() for line in content if line.startswith("FLASER")]
             scans = np.array([list(map(float, line[2:(POINTS_PER_SCAN + 2)])) for line in lines])
