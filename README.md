@@ -1,2 +1,2 @@
 # Thesis
-SLAM simulation using a hybrid topological/metric map and location based localisation.
+Rao Blackwellised Particle Filter (RBPF) SLAM simulation using a tiled occupancy grid maps.
